@@ -17,9 +17,9 @@
     {
       "repository": "dsh-lan-discovery",
       "name": "dsh-lan-discovery",
-      "file": "dsh-lan-discovery-0.4.0.tgz",
-      "sha256": "df47c078f9774c567c7740fd3acd6ed9b73ba2b2bea029370dd2133baa872597",
-      "version": "0.4.0"
+      "file": "dsh-lan-discovery-0.5.0.tgz",
+      "sha256": "688c07a7c5481f9534b42ed228b0d17085d7c07f48d573814f25573f295c895e",
+      "version": "0.5.0"
     }
   ],
   "schema": "llm-discovery-component-manifest/v1"

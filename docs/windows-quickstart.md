@@ -65,7 +65,7 @@ node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime .runtime
 
 保留原有私钥、证书、token、marker 和 runId，仅更新认证/拓扑并解除旧 tokenFile 引用；初始化不会隐式迁移。新版启动使用 `--remove-orphans`，只移除同一项目已经退役的 node-c。
 
-随后按 [API key 三状态演示](api-key-demo.md) 在 GLM 卡片保存一次 key，Vision 保持未配置，即可看到免 key、已保存和待输入三种状态。默认保存使用 Harness 的本地凭据 provider（当前是未加密 YAML）；可取消“记住 API key”而仅本次使用。
+随后按 [API key 三状态演示](api-key-demo.md) 点击展开 GLM 服务后保存一次 key，Vision 保持未配置，即可看到免 key、已保存和待输入三种状态。默认保存使用 Harness 的本地凭据 provider（当前是未加密 YAML）；可取消“记住 API key”而仅本次使用。
 
 ## Runtime、IP 变化与 Harness
 
@@ -82,7 +82,7 @@ node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime .runtime
 安装插件前完全退出 Harness，再使用当前安装版自带 CLI 安装本仓库的插件包。将以下应用路径替换为自己的 Harness 安装位置，在 Demo 根目录运行：
 
 ```powershell
-& 'C:\path\to\DeepseekHarness\resources\runtime\cli\bin\dsh.cmd' plugin --profile desktop add (Join-Path $PWD 'vendor/dsh-lan-discovery-0.4.0.tgz')
+& 'C:\path\to\DeepseekHarness\resources\runtime\cli\bin\dsh.cmd' plugin --profile desktop add (Join-Path $PWD 'vendor/dsh-lan-discovery-0.5.0.tgz')
 ```
 
 这会安装打包版本，日常运行不需要保留插件源码 checkout。配置、升级和断开恢复步骤见插件安装说明。独立插件默认关闭演示行为；本 Demo 需按说明显式设置 `demoMode: true`，启用固定 marker 工具和 Mock 上下文标注。插件界面优先跟随 Harness 语言偏好，没有偏好时按系统语言选择，支持中文与英语。

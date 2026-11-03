@@ -1,6 +1,6 @@
 # 局域网 LLM API 服务发现 Demo 实施计划
 
-- 版本：v0.4.0，三种凭据状态与保存版，2026-11-03。
+- 版本：v0.5.0，点击展开的服务列表版，2026-11-03。
 - 基线：[draft-cui-dawn-local-llm-api-discovery-00](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/)。
 - 客户端：现有 DeepSeek Harness Desktop 0.2.1-rc.3 / 0.2.1-rc.5。
 - 用户确定的约束：**只有容器发布公告；Windows 只运行发现客户端。**
@@ -59,7 +59,7 @@ flowchart LR
 
 每服务有独立 DNS-SD 实例、模型白名单、路径与认证策略，需要 key 的服务分别校验。A 的两项服务共享端口但可单独上下线，不能按 IP 合并服务。
 
-展示层使用真实公开型号及模拟部署规格：A 为 DeepSeek-R1-Distill-Qwen-32B（Q4_K_M）与 Qwen2.5-VL-7B-Instruct（BF16），B 为 GLM-4-9B-Chat（INT4）。上述表格中的 `mock-*` 保留为请求 ID；卡片和 Harness 模型菜单使用展示名。能力标签只突出图像、工具调用，文本和 SSE 不作为常规标签。字段、来源及 Mock 边界见 [模型展示说明](docs/model-presentation.md)。
+展示层使用真实公开型号及模拟部署规格：A 为 DeepSeek-R1-Distill-Qwen-32B（Q4_K_M）与 Qwen2.5-VL-7B-Instruct（BF16），B 为 GLM-4-9B-Chat（INT4）。上述表格中的 `mock-*` 保留为请求 ID；服务条目和 Harness 模型菜单使用展示名。能力标签只突出图像、工具调用，文本和 SSE 不作为常规标签。字段、来源及 Mock 边界见 [模型展示说明](docs/model-presentation.md)。
 
 默认三个服务同时支持流式及非流式响应。C 仅保留为独立 nonstream-only 测试夹具，不在默认 Compose 中，用来覆盖“发现成功、当前流式适配器不能接入”的兼容性区别。
 
@@ -94,7 +94,7 @@ flowchart LR
 | dsh-lan-discovery | 独立 Harness 插件：双语原生侧栏、能力过滤、信任验证、配置事务、Responses 适配 |
 | LLM_service_discovery（本仓库） | Demo 的 mock-api、lab-controller、Compose、网络与演示脚本、集成验证和文档 |
 
-四个仓库采用 MIT 许可证，源码托管于 GitHub 的 `nobrowning` 账号下。可复用组件的维护源码从 Demo 分离；Demo 的 `packages/` 只保留 `mock-api` 和 `lab-controller`。发现核心库与公告器为 0.3.0，Harness 插件为 0.4.0，通过 `vendor/*.tgz` 和 lockfile 固定，单独取得 Demo 仓库即可 `npm ci`，不依赖兄弟目录或尚未发布的 npm 包。仓库关系、打包与更新步骤见 [独立仓库说明](docs/repositories.md)。
+四个仓库采用 MIT 许可证，源码托管于 GitHub 的 `nobrowning` 账号下。可复用组件的维护源码从 Demo 分离；Demo 的 `packages/` 只保留 `mock-api` 和 `lab-controller`。发现核心库与公告器为 0.3.0，Harness 插件为 0.5.0，通过 `vendor/*.tgz` 和 lockfile 固定，单独取得 Demo 仓库即可 `npm ci`，不依赖兄弟目录或尚未发布的 npm 包。仓库关系、打包与更新步骤见 [独立仓库说明](docs/repositories.md)。
 
 使用 JavaScript ESM，Node >=24 为当前完整复现基线。服务镜像仅包含所需服务代码与安装后的运行依赖，不含 Harness 或客户端 marker。
 
@@ -155,7 +155,7 @@ node scripts/verify-live.mjs
 .\scripts\stop-demo.ps1
 ```
 
-插件使用 Desktop 自带 CLI 安装 `vendor/dsh-lan-discovery-0.4.0.tgz`，不用其他 npm 版 dsh 改桌面 profile。日常部署不需要插件源码仓库；修改插件时在独立 `dsh-lan-discovery` 仓库构建、验证并更新安装包。具体命令和配置见 [插件安装说明](docs/plugin-setup.md)。
+插件使用 Desktop 自带 CLI 安装 `vendor/dsh-lan-discovery-0.5.0.tgz`，不用其他 npm 版 dsh 改桌面 profile。日常部署不需要插件源码仓库；修改插件时在独立 `dsh-lan-discovery` 仓库构建、验证并更新安装包。具体命令和配置见 [插件安装说明](docs/plugin-setup.md)。
 
 A Text 单独上下线使用容器 SIGUSR2，避开 Node 保留的 SIGUSR1。API readiness 驱动对应实例撤销和恢复，Vision 仍运行。
 
@@ -186,7 +186,7 @@ A Text 单独上下线使用容器 SIGUSR2，避开 Node 保留的 SIGUSR1。API
 
 ## 10. 凭据保存与三种演示状态（0.4.0）
 
-初始布局：DeepSeek 无需 key；GLM 已保存 key；Qwen-VL 尚未填写 key。先用 GLM 自己的本地合成 key 在卡片验证并保存，再断开，Vision 保持未配置。展示已保存状态不把 key 填回密码框，也不自动连接。
+初始布局：DeepSeek 无需 key；GLM 已保存 key；Qwen-VL 尚未填写 key。先用 GLM 自己的本地合成 key 在服务条目验证并保存，再断开，Vision 保持未配置。展示已保存状态不把 key 填回密码框，也不自动连接。
 
 输入 key 默认选择“记住 API key”；通过模型和能力接口验证后，插件使用 Harness 官方 credentials 服务保存。当前默认 provider 写入本地未加密 YAML，不是系统加密保险库，文档明确说明；取消勾选则仅本次运行使用。凭据按精确端点、证书、允许地址和认证策略绑定，不按服务名或 IP 共享。
 
@@ -197,3 +197,11 @@ Demo 演示者从本地 presenter/demo-api-keys.txt 取得随机 fixture，插�
 ### 历史版本
 
 0.3.0/0.3.1 使用三节点四服务、两免 key 两需 key，用户输入只保留于单次 Harness 运行。该版本的测试和桌面记录作为历史证据保留，不能作为 0.4.0 的持久化与三服务验收。
+
+## 11. 服务列表交互（0.5.0）
+
+初始列表仅显示服务名称、地址、已知规格与特殊能力、凭据状态。点击条目后展开检查、连接和 key 管理，同一时间只展开一项；选择条目不自动请求 API 或接入。收起、切换或条目消失会清除未提交的密码。
+
+取消统一的 Mock/已发现角标，只有已注册的服务路由显示已接入。服务明确声明 mock:true 时在展开详情显示模拟说明；缺少该声明不推断为真实模型。插件适用于真实服务，模拟能力仅由独立 Demo 提供。
+
+本版本未更改服务端、核心库与公告器，继续使用 0.4.0 容器镜像和 0.3.0 核心/公告器。

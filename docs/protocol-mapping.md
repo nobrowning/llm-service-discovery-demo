@@ -1,6 +1,6 @@
 # 协议映射、实验扩展与实现边界
 
-适用版本：本仓库 v0.4.0 演示实现；核对日期：2026-11-03。基础发现对照 [draft-cui-dawn-local-llm-api-discovery-00](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/)。该文档仍是 Internet-Draft；本项目不代表 IETF 已采纳或认证。
+适用版本：本仓库 v0.5.0 演示实现（发现与服务协议沿用 v0.4.0）；核对日期：2026-11-03。基础发现对照 [draft-cui-dawn-local-llm-api-discovery-00](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/)。该文档仍是 Internet-Draft；本项目不代表 IETF 已采纳或认证。
 
 本文区分草案的线协议、本项目的部署选择以及已实现功能。设计目标、单元测试通过和真实 Desktop 验收是不同证据；请同时保留具体版本、测试输出与现场记录。
 

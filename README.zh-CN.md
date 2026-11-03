@@ -11,7 +11,7 @@
 
 API 均为 Mock，无需模型、GPU 或云额度。网络发现、HTTPS/认证、SSE、图片传输和工具往返真实执行；不提供真实推理或联网搜索。
 
-卡片只显示图像、工具调用等特殊能力，型号、版本及量化 / 精度的展示约定见 [模型展示说明](docs/model-presentation.md)。
+紧凑的服务列表只显示图像、工具调用等已知特殊能力；型号、版本及量化 / 精度的展示约定见 [模型展示说明](docs/model-presentation.md)。模拟服务在展开详情中说明其性质，列表不再用统一的 Mock / 非 Mock 标签；普通部署使用同一套界面。
 
 ## 启动
 
@@ -27,11 +27,11 @@ npm test
 node scripts/verify-live.mjs
 ```
 
-按 [Windows 快速部署](docs/windows-quickstart.md) 和 [插件安装说明](docs/plugin-setup.md) 操作。Demo 的 `vendor/` 包含版本化组件安装包，单独取得本仓库即可 `npm ci`，无需旁边再放其他源码仓库。使用已安装 Harness 自带 CLI 安装 `vendor/dsh-lan-discovery-0.4.0.tgz`。Windows 防火墙弹窗需要用户手动处理。
+按 [Windows 快速部署](docs/windows-quickstart.md) 和 [插件安装说明](docs/plugin-setup.md) 操作。Demo 的 `vendor/` 包含版本化组件安装包，单独取得本仓库即可 `npm ci`，无需旁边再放其他源码仓库。使用已安装 Harness 自带 CLI 安装 `vendor/dsh-lan-discovery-0.5.0.tgz`。Windows 防火墙弹窗需要用户手动处理。
 
-在 Harness 侧栏打开“局域网服务 / LAN services”，点击“检查服务”，再“连接并新建会话”。插件支持中文和英语，使用 Harness 官方语言服务，优先跟随 Harness 语言偏好，没有偏好时跟随系统语言。能力标签来自已认证的服务声明；信任配置独立初始化，不靠发现记录授权未知服务。
+在 Harness 侧栏打开“局域网服务 / LAN services”。初始列表像 Wi-Fi 选择器一样，仅展示服务名称、地址、已知能力和 key 状态；点击一项后再出现检查、连接和 key 输入等操作。每次只展开一项，选中本身不会自动连接；收起或切换服务会清除未提交的密码。插件支持中文和英语，使用 Harness 官方语言服务，优先跟随 Harness 语言偏好，没有偏好时跟随系统语言。能力标签来自已认证的服务声明；信任配置独立初始化，不靠发现记录授权未知服务。
 
-**三种认证状态：** DeepSeek 无需 key；GLM 使用已经保存的 key；Qwen-VL 尚未填写 key。首次准备时，从 `.runtime/current/presenter/demo-api-keys.txt` 取得 GLM 的随机演示 key，保留“记住 API key”后验证连接，Qwen-VL 保持未配置。保存的 key 可跨 Harness 重启恢复，也可取消勾选而仅本次使用。插件采用 Harness 官方凭据服务；当前默认 provider 写入本地未加密 YAML，页面和公告不返回 key。旧环境迁移、错误 key 重试及重置步骤见 [API key 演示说明](docs/api-key-demo.md)。
+**三种认证状态：** DeepSeek 无需 key；GLM 使用已经保存的 key；Qwen-VL 尚未填写 key。首次准备时，展开 GLM，从 `.runtime/current/presenter/demo-api-keys.txt` 取得其随机演示 key，保留“记住 API key”后验证连接，Qwen-VL 保持未配置。“已保存”仅说明本地有凭据，不表示刚刚连接成功。保存的 key 可跨 Harness 重启恢复，也可取消勾选而仅本次使用。插件采用 Harness 官方凭据服务；当前默认 provider 写入本地未加密 YAML，页面和公告不返回 key。旧环境迁移、错误 key 重试及重置步骤见 [API key 演示说明](docs/api-key-demo.md)。
 
 免 key 的 Open Responses 服务是本 Demo 的明确实验扩展：当前草案 -00 的绑定要求 `auth=required`。两种方式都保留独立 TLS 信任校验。
 

@@ -1,16 +1,18 @@
-# API key 三状态演示（0.4.0）
+# API key 三状态演示（0.5.0）
 
 | 服务 | 初始演示状态 | 操作 |
 |---|---|---|
-| DeepSeek-R1-Distill-Qwen-32B | 无需 API key | 直接连接并新建会话 |
-| GLM-4-9B-Chat | 已保存 API key | 直接使用已保存的 key 连接 |
-| Qwen2.5-VL-7B-Instruct | 尚未填写 API key | 输入对应 key，验证并连接 |
+| DeepSeek-R1-Distill-Qwen-32B | 无需 API key | 展开后直接连接并新建会话 |
+| GLM-4-9B-Chat | 已保存 API key | 展开后使用已保存的 key 连接 |
+| Qwen2.5-VL-7B-Instruct | 尚未填写 API key | 展开后输入对应 key，验证并连接 |
 
 A 节点上的 DeepSeek 和 Qwen-VL 共享主机与端口，但使用不同 API 路径和认证策略；B 节点提供 GLM。GLM 的 key 不能用于 Qwen-VL。认证状态单独展示，不作为模型能力标签。“已保存”是客户端状态，不是公告里的新认证类型。
 
+初始界面仅展示服务信息和凭据状态，点击服务行才出现输入框及接入操作；每次只展开一项。选中不会自动连接，收起或切换服务会清除未提交的密码。“已保存”不证明当前 key 仍有效或服务可达，连接时仍会验证。已注册插件路由的服务显示“已接入”；其他服务不需要统一的“已发现”或“非 Mock”标签。若接口明确声明 `mock: true`，展开详情中显示模拟服务说明。
+
 ## 启动与旧环境更新
 
-新环境使用 `scripts/start-demo.ps1` 初始化两节点、三服务。安装 `vendor/dsh-lan-discovery-0.4.0.tgz`，详见 [插件安装](plugin-setup.md)。
+新环境使用 `scripts/start-demo.ps1` 初始化两节点、三服务。安装 `vendor/dsh-lan-discovery-0.5.0.tgz`，详见 [插件安装](plugin-setup.md)。
 
 如果此前运行过四服务版本，先断开 LAN 连接并完全退出 Harness，然后执行：
 
@@ -24,17 +26,17 @@ node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime .runtime
 ## 演示前准备已保存的 GLM
 
 1. 在自己的屏幕打开 `.runtime/current/presenter/demo-api-keys.txt`，可使用 `.\scripts\open-demo-api-keys.ps1`。其中 key 仅用于本机 Mock，不是真实模型厂商凭据；文件内容不进入投影、录像或公开材料。
-2. 在 GLM 卡片粘贴对应 key，保留默认选中的“记住 API key”，点击“验证并连接”。只有通过服务的模型与能力接口验证后才保存。
-3. 返回服务页并断开连接。GLM 保持“已保存”，Qwen-VL 保持未配置。若 Vision 已有 key，先在其卡片清除。
+2. 点击 GLM 服务行展开，在密码框粘贴对应 key，保留默认选中的“记住 API key”，点击“验证并连接”。只有通过服务的模型与能力接口验证后才保存。
+3. 返回服务页并断开连接。GLM 保持“已保存”，Qwen-VL 保持未配置。若 Vision 已有 key，先展开该服务并清除。
 4. 重启 Harness，核对 DeepSeek 无需 key、GLM 已保存、Qwen-VL 待输入。保存不会自动连接，也不会把 key 填回密码框。
 
 这一步模拟用户以前已经配置过 GLM。插件不会自行读取 `presenter/demo-api-keys.txt` 或 `server/tokens.json`；发现服务本身也不会获得 key。
 
 ## 展示顺序
 
-1. 直接连接 DeepSeek，发送文本并收到真实 HTTPS/SSE 的 Mock 响应；请求不带 Authorization。
-2. 直接连接 GLM，无需再次输入。可继续演示函数调用和客户端工具回传。
-3. 在 Qwen-VL 输入一个错误的演示 key，确认被拒绝、密码框清空，并可重试；再输入它自己的正确 key，验证后接入并发送图片。
+1. 展开 DeepSeek 并连接，发送文本并收到真实 HTTPS/SSE 的 Mock 响应；请求不带 Authorization。
+2. 展开 GLM 并连接，无需再次输入。可继续演示函数调用和客户端工具回传。
+3. 展开 Qwen-VL，输入一个错误的演示 key，确认被拒绝、密码框清空，并可重试；再输入它自己的正确 key，验证后接入并发送图片。
 4. 演示“记住 API key”：选中时重启后仍可连接；取消时仅本次 Harness 运行有效。保存后的值不返回页面。
 5. 更换 key 先验证新值；错误替换不覆盖原来可用的 key。“清除”移除该服务在插件中的已保存凭据、会话凭据和路由，并在适用时恢复默认模型。普通“断开”保留已保存 key。
 6. 展示结束后清除 Qwen-VL，保留 GLM 已保存，回到三状态初始布局。

@@ -2,12 +2,13 @@
 
 项目采用 MIT 许可证，拆分为发现核心库、服务端公告器、Harness 插件和 Demo 四个独立源码仓库。源码仓库链接见 [仓库与依赖](repositories.md)；尚未发布 npm 或镜像 registry。
 
-Demo 通过 `vendor/*.tgz` 使用发现核心库 / 公告器 0.3.0 和 Harness 插件 0.4.0 安装包，并用 lockfile 固定依赖；只取得 Demo 仓库即可执行 `npm ci`，无需其他仓库位于相邻目录。插件安装与配置见 [plugin-setup.md](plugin-setup.md)，组件维护和更新方式见 [repositories.md](repositories.md)。
+Demo 通过 `vendor/*.tgz` 使用发现核心库 / 公告器 0.3.0 和 Harness 插件 0.5.0 安装包，并用 lockfile 固定依赖；只取得 Demo 仓库即可执行 `npm ci`，无需其他仓库位于相邻目录。插件安装与配置见 [plugin-setup.md](plugin-setup.md)，组件维护和更新方式见 [repositories.md](repositories.md)。
 
 ## 已准备
 
 - 中英文 README、实现计划、协议映射、演示脚本与 Windows 快速启动。
 - 免 key / 已保存 key / 待输入 key 的三服务演示；密码输入、错误重试、Harness 凭据持久化与可选仅本次使用，独立 TLS 信任。当前默认凭据 provider 是本地未加密 YAML，文档说明此限制。
+- 先浏览、再展开单项的服务选择流程；密码框及管理操作按需显示，收起或切换会清除未提交密码。主列表仅显示通用服务与凭据状态，模拟性质放在明确声明的服务详情中，普通服务无需“非 Mock”标签。
 - 已选定 MIT；各仓库保留许可证和版权声明。
 - 可复用源码的独立仓库边界，以及 Demo 使用版本化组件包的部署方式。
 - 插件使用 Harness 官方 locale 服务支持中文与英语，优先跟随 Harness 偏好，否则跟随系统语言。
@@ -15,7 +16,7 @@ Demo 通过 `vendor/*.tgz` 使用发现核心库 / 公告器 0.3.0 和 Harness �
 - 协议/API/插件边界自动测试，以及真实网络/独立 observer 验证脚本。
 - 忽略 .runtime、node_modules、.reference、密钥、token 和机器上的证据文件；`vendor/` 中经过审查的组件 tarball 是有意纳入版本控制的部署依赖。
 - 插件使用 npm files 白名单；本地参考解包、用户 profile 不在发行文件内。
-- 历史四服务版本的本机真实 Harness 桌面验收覆盖四服务发现、能力筛选、Text/Basic 文本、图片字节传输、原生工具往返、冷启动恢复和断开恢复默认模型。0.4.0 三服务、保存/清除凭据及重启后的实际验收另行记录，不能直接沿用旧验收结论；详见验证报告。
+- 历史四服务版本的本机真实 Harness 桌面验收覆盖四服务发现、能力筛选、Text/Basic 文本、图片字节传输、原生工具往返、冷启动恢复和断开恢复默认模型。0.4.0 的三服务及持久化验收、0.5.0 的列表交互验收按实际执行分别记录，不能直接沿用旧验收结论；详见验证报告。
 
 ## 发布前完成
 

@@ -1,4 +1,4 @@
-# IETF 五分钟现场演示（0.4.0）
+# IETF 五分钟现场演示（0.5.0）
 
 Windows 原生 Harness + 已有 Ubuntu WSL 内两个容器、三个 API。先完成 [快速部署](windows-quickstart.md)、[插件安装](plugin-setup.md) 和 [API key 三状态准备](api-key-demo.md)。下载、构建、信任初始化和预保存 GLM 不计入五分钟。
 
@@ -15,10 +15,10 @@ node scripts/verify-live.mjs
 
 旧四服务 runtime 先在 Harness 完全退出后运行 `node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime .runtime/current`，再启动。只启动旧目录不会隐式迁移。
 
-在 GLM 卡片输入本地合成 key，保留“记住 API key”，验证成功后断开；Qwen-VL 不保存 key。重启 Harness 后核对三种状态：
+点击 GLM 服务行展开，输入本地合成 key，保留“记住 API key”，验证成功后断开；Qwen-VL 不保存 key。重启 Harness 后核对三种状态：
 
 - DeepSeek R1 Distill：无需 key。
-- GLM-4-9B-Chat：已保存 key，点击即可连接。
+- GLM-4-9B-Chat：已保存 key，展开后可直接连接。
 - Qwen2.5-VL：尚未填写 key，需要输入。
 
 保存使用 Harness 官方凭据服务，当前默认 provider 是本地未加密 YAML；页面不回传 key。取消“记住 API key”可以仅本次使用。详细保存、清除和身份边界见 [API key 说明](api-key-demo.md)。
@@ -58,15 +58,17 @@ Invoke-DemoCompose ps
 .\scripts\start-demo.ps1 -SkipBuild
 ```
 
-确认 Studio Workstation 上的 DeepSeek、Qwen-VL，以及 IP 标识节点上的 GLM 出现。展开“协议与地址”，展示 `.local` 主机名、端口及 base path。
+确认 Studio Workstation 上的 DeepSeek、Qwen-VL，以及 IP 标识节点上的 GLM 出现。列表初始只展示服务信息和 key 状态，像 Wi-Fi 选择器一样点击某项才展开操作区。选中不会自动接入；在展开项内打开“协议与地址”，展示 `.local` 主机名、端口及 base path。
 
 三种状态同时可见：DeepSeek 无需 key；GLM 已保存；Qwen-VL 待输入。能力在检查成功后显示，特殊标签仅包括图像和工具调用；型号、参数量、版本及量化是模拟部署元数据。
+
+左上角不再为每项显示 Mock 或已发现标签。只有已有插件路由的服务显示“已接入”；模拟性质在服务声明 `mock: true` 后作为展开详情中的说明。真实部署使用同一界面，不需要“非 Mock”标签。已保存 key 不是连接成功证明。
 
 > A 同时提供两个独立 API，一项免 key、一项要求 key。共享主机不代表共用凭据。已保存是客户端的状态；网络公告不包含 key，也不告诉其他客户端你是否配置过。
 
 ## 1:15—2:00：免 key 与已保存 key 均可一键接入
 
-先连接 DeepSeek，新会话发送：
+展开 DeepSeek 并点击连接，新会话发送：
 
 ```text
 请回答 hello，并显示本次响应的节点与服务标记。
@@ -96,7 +98,7 @@ Invoke-DemoCompose ps
 
 ## 2:45—3:30：真实客户端工具往返
 
-连接已经保存 key 的 GLM，发送：
+展开已经保存 key 的 GLM 并连接，发送：
 
 ```text
 请调用 demo_read_marker 读取本次实验标记，然后显示工具回传的结果。
