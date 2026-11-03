@@ -51,6 +51,8 @@ async function fixture(t) {
   await write('node_modules/thunky/package.json', '{"name":"thunky","version":"1.1.0"}');
   await write('node_modules/@leichtgewicht/ip-codec/package.json', '{"name":"@leichtgewicht/ip-codec","version":"2.0.5"}');
   await write('node_modules/.bin/ignored.cmd', 'must not be included');
+  await write('node_modules/@release-test/component/.dependency-metadata', 'hidden dependency file must be retained');
+  await write('node_modules/@release-test/component/.data/required.json', '{"hiddenDirectory":true}');
   await write('.runtime/private.txt', 'must not be included');
   await write('.env', 'fixture-only=must-not-be-included');
   for (const script of ['prepare-release.mjs', 'package-release.ps1', 'verify-release-files.mjs']) {
@@ -76,6 +78,7 @@ test('native and WSL staging include the matching runtime and hashes without loc
   assert.equal(nativeManifest.platform, 'native-node');
   assert.equal(nativeManifest.version, '9.8.7');
   assert.equal(nativeManifest.image, undefined);
+  assert.deepEqual(nativeManifest.targets, ['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64', 'win32-x64']);
   assert.deepEqual(nativeManifest.components, [f.component]);
   success(f.verify(native));
   assert.equal(await readFile(path.join(native, 'packages/lab-controller/native.mjs'), 'utf8'), '// tracked native entry\n');
@@ -149,6 +152,8 @@ finally { $archive.Dispose() }
       const entries = JSON.parse(success(run(powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', inspector, '-Zip', archivePath], f.root)));
       assert.ok(entries.some(entry => entry.startsWith('scripts/')), 'Nested ZIP entries use POSIX separators');
       assert.ok(entries.every(entry => !entry.includes('\\') && !entry.startsWith('/') && !entry.includes(':')), 'ZIP entry paths must be portable across Windows/macOS/Linux');
+      assert.ok(entries.includes('node_modules/@release-test/component/.dependency-metadata'), 'ZIP retains hidden dependency files on Unix');
+      assert.ok(entries.includes('node_modules/@release-test/component/.data/required.json'), 'ZIP retains files inside hidden dependency directories');
     }
     assert.notEqual(invoke(['-Platform', 'native', '-OutputDirectory', output]).status, 0);
     assert.equal((await readFile(path.join(output, 'SHA256SUMS'), 'utf8')).trim().split('\n').length, 2, 'A refused rebuild must not append a duplicate checksum');

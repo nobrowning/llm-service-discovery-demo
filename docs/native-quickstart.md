@@ -1,12 +1,12 @@
 # macOS、Linux 与 Windows 原生启动
 
-本路线从 0.6.0 起提供。两个本机 Node.js 子进程各自提供 Mock HTTPS API 和 mDNS 公告，共三项服务；需要 Node.js 24+，无需 Docker、WSL 或模型。macOS Apple Silicon/Intel、Linux arm64/x64 使用对应架构的 Node；Windows x64 同样使用此入口。实际覆盖见 [验证报告](validation-report.md)，支持的 Harness Host 与服务端运行平台分开判断。
+本路线从 0.6.1 起提供。两个本机 Node.js 子进程各自提供 Mock HTTPS API 和 mDNS 公告，共三项服务；需要 Node.js 24+，无需 Docker、WSL 或模型。macOS Apple Silicon/Intel、Linux arm64/x64 使用对应架构的 Node；Windows x64 同样使用此入口。实际覆盖见 [验证报告](validation-report.md)，支持的 Harness Host 与服务端运行平台分开判断。
 
 ## 下载与校验
 
-从 [Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/latest) 下载 `llm-service-discovery-demo-0.6.0-native.zip` 和同页 `SHA256SUMS`。先核对 ZIP 的 SHA-256：macOS 使用 `shasum -a 256 文件.zip`，Linux 使用 `sha256sum 文件.zip`，Windows PowerShell 使用 `Get-FileHash 文件.zip -Algorithm SHA256`。核对值来自同次 Release。
+从 [Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/latest) 下载 `llm-service-discovery-demo-0.6.1-native.zip` 和同页 `SHA256SUMS`。先核对 ZIP 的 SHA-256：macOS 使用 `shasum -a 256 文件.zip`，Linux 使用 `sha256sum 文件.zip`，Windows PowerShell 使用 `Get-FileHash 文件.zip -Algorithm SHA256`。核对值来自同次 Release。
 
-解压后进入目录。ZIP 已含 JavaScript 依赖和组件 tgz，不包含 Node.js、Harness 或运行凭据。GitHub 自动生成的 Source code 包则需要先执行 `npm ci --ignore-scripts`。
+解压后进入目录。ZIP 已含 JavaScript 依赖和组件 tgz，不包含 Node.js、Harness 或运行凭据。GitHub 自动生成的 Source code 包则需要先执行 `npm ci --ignore-scripts`；源码没有发行清单，跳过下方的 `verify-release-files.mjs`（该命令仅用于部署 ZIP），其他指令相同。
 
 ```sh
 node --version

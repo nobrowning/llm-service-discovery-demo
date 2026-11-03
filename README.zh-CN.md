@@ -12,8 +12,8 @@
 
 | 运行方式 | 附件 | 前提 |
 |---|---|---|
-| macOS、Linux、Windows 原生进程 | `llm-service-discovery-demo-0.6.0-native.zip` | 对应系统/架构的 Node.js 24+ |
-| Windows 客户端 + 两个 Linux 容器 | `llm-service-discovery-demo-0.6.0-windows-x64-wsl.zip` | Windows x64、Node.js 24+、已有 x64 Ubuntu WSL |
+| macOS、Linux、Windows 原生进程 | `llm-service-discovery-demo-0.6.1-native.zip` | 对应系统/架构的 Node.js 24+ |
+| Windows 客户端 + 两个 Linux 容器 | `llm-service-discovery-demo-0.6.1-windows-x64-wsl.zip` | Windows x64、Node.js 24+、已有 x64 Ubuntu WSL |
 
 两个 ZIP 均带 JavaScript 依赖和插件 tgz；只有 WSL 包带预构建 linux/amd64 镜像。Node.js 与 Harness 需另行安装。GitHub 自动提供的 Source code 包需要先执行 `npm ci --ignore-scripts`。
 

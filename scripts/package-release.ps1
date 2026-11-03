@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.IO.Compression
 # Emit portable ZIP paths explicitly so macOS/Linux unzip exits successfully.
 $archive = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
 try {
-    foreach ($file in (Get-ChildItem -LiteralPath $stage -File -Recurse | Sort-Object FullName)) {
+    foreach ($file in (Get-ChildItem -LiteralPath $stage -File -Recurse -Force | Sort-Object FullName)) {
         $entryName = $file.FullName.Substring($stage.Length + 1).Replace('\', '/')
         [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, $entryName, [IO.Compression.CompressionLevel]::Optimal) | Out-Null
     }

@@ -75,7 +75,7 @@ const manifest = {
   schema: 'llm-discovery-demo-release/v1', version: pkg.version,
   sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   platform: platform === 'native' ? 'native-node' : 'windows-x64-wsl-ubuntu-amd64',
-  ...(imagePath ? { image: { file: imageRelative, tag: `llm-discovery-demo:${pkg.version}`, id: options['image-id'], sha256: hashes[imageRelative] } } : { systems: ['darwin', 'linux', 'win32'], architectures: ['arm64', 'x64'] }),
+  ...(imagePath ? { image: { file: imageRelative, tag: `llm-discovery-demo:${pkg.version}`, id: options['image-id'], sha256: hashes[imageRelative] } } : { targets: ['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64', 'win32-x64'] }),
   prerequisites: { node: '>=24', ...(imagePath ? { wsl: 'existing x86-64 Ubuntu', firstStartNetwork: 'Docker static tools and Compose are downloaded when absent' } : {}), harness: ['0.2.1-rc.3', '0.2.1-rc.5'] },
   components: components.components,
 };

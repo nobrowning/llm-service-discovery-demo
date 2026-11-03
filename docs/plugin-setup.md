@@ -4,7 +4,7 @@
 
 ## 安装与配置
 
-先按[原生部署](native-quickstart.md)启动；Windows/WSL 路线使用 `scripts/start-demo.ps1`。Release ZIP 已带 JavaScript 依赖，从源码克隆时先执行 `npm ci --ignore-scripts`。完全退出 Harness，再用该 Desktop 安装自带的 CLI 添加包。替换下面的安装路径：
+先按[原生部署](native-quickstart.md)启动；Windows/WSL 路线使用 `scripts/start-demo.ps1`。Release ZIP 已带 JavaScript 依赖，从源码克隆时先执行 `npm ci --ignore-scripts`。首次安装 Harness 时，先启动 Desktop 一次以初始化 profile，再完全退出；使用该 Desktop 安装自带的 CLI 添加包。替换下面的安装路径：
 
 ```powershell
 $dsh = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'

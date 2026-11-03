@@ -12,8 +12,8 @@ Choose an asset from [GitHub Releases](https://github.com/nobrowning/llm-service
 
 | Deployment | Asset | Prerequisites |
 |---|---|---|
-| Native processes on macOS, Linux or Windows | `llm-service-discovery-demo-0.6.0-native.zip` | Node.js 24+ for your OS/architecture |
-| Two Linux containers, Windows client | `llm-service-discovery-demo-0.6.0-windows-x64-wsl.zip` | Windows x64, Node.js 24+, existing x64 Ubuntu WSL |
+| Native processes on macOS, Linux or Windows | `llm-service-discovery-demo-0.6.1-native.zip` | Node.js 24+ for your OS/architecture |
+| Two Linux containers, Windows client | `llm-service-discovery-demo-0.6.1-windows-x64-wsl.zip` | Windows x64, Node.js 24+, existing x64 Ubuntu WSL |
 
 Both contain JavaScript dependencies and the plugin tgz. Only the WSL ZIP contains the prebuilt linux/amd64 image. Node.js and Harness are installed separately. GitHub's automatic **Source code** archives require `npm ci --ignore-scripts` first.
 

@@ -7,7 +7,7 @@ Demo 通过 `vendor/*.tgz` 使用发现核心库 / 公告器 0.3.1 和 Harness �
 ## 已准备
 
 - GitHub Release 分发流程：组件提供 tgz 与 SHA256SUMS；Demo 提供三平台 native ZIP，以及另带 linux/amd64 镜像的 Windows/WSL ZIP。tag workflow 先生成草稿，下载验收后发布。
-- Demo 0.6.0 启动器校验发行镜像 SHA-256、tag 与 image ID，再载入专用 daemon；部署 ZIP 不需本地构建和 Node 基础镜像，首次工具下载仍需网络。
+- Demo 0.6.1 启动器校验发行镜像 SHA-256、tag 与 image ID，再载入专用 daemon；部署 ZIP 不需本地构建和 Node 基础镜像，首次工具下载仍需网络。
 - 中英文 README、原生 macOS/Linux/Windows 指令、Mac SSH 连接说明、插件平台限制、演示脚本与 Windows 快速启动。
 - 免 key / 已保存 key / 待输入 key 的三服务演示；密码输入、错误重试、Harness 凭据持久化与可选仅本次使用，独立 TLS 信任。当前默认凭据 provider 是本地未加密 YAML，文档说明此限制。
 - 先浏览、再展开单项的服务选择流程；密码框及管理操作按需显示，收起或切换会清除未提交密码。主列表仅显示通用服务与凭据状态，模拟性质放在明确声明的服务详情中，普通服务无需“非 Mock”标签。
