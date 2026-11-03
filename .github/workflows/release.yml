@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,15 +41,17 @@ jobs:
           docker image inspect "llm-discovery-demo:$version" --format '{{.Id}}' > .release-input/image-id.txt
       - name: Package deployment ZIP
         shell: pwsh
-        run: ./scripts/package-release.ps1 -ImageArchive .release-input/image.tar.gz -ImageId (Get-Content .release-input/image-id.txt) -OutputDirectory .release
+        run: |
+          ./scripts/package-release.ps1 -ImageArchive .release-input/image.tar.gz -ImageId (Get-Content .release-input/image-id.txt) -OutputDirectory .release
+          ./scripts/package-release.ps1 -Platform native -OutputDirectory .release
       - name: Check extracted dependencies and package digests
         run: |
-          mkdir .release-extracted
-          unzip -q .release/*.zip -d .release-extracted
-          cd .release-extracted
-          sha256sum -c SHA256SUMS > /dev/null
-          node scripts/verify-components.mjs
-          npm test
+          for zip in .release/*.zip; do
+            directory=".release-extracted/$(basename "$zip" .zip)"
+            mkdir -p "$directory"
+            unzip -q "$zip" -d "$directory"
+            (cd "$directory" && node scripts/verify-release-files.mjs && node scripts/verify-components.mjs && npm test)
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: demo-release-download

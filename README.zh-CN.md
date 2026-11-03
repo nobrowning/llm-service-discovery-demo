@@ -1,70 +1,72 @@
 # 局域网 LLM API 服务发现 Demo
 
-在现有 DeepSeek Harness 内发现局域网 LLM API，选择服务后一键配置并新建会话。对应 [IETF 草案](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/) 的本机可运行实验。
+[English](README.md) · [验证报告](docs/validation-report.md) · [协议映射](docs/protocol-mapping.md)
 
-**两容器、三服务、容器自行公告。Windows 只运行客户端。**
+在 DeepSeek Harness 内发现局域网 LLM API，检查服务后接入正常会话。对应 [IETF 草案 -00](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/) 的实现实验。
 
-| 节点 | 服务 | 能力 |
+两个节点各自发布 mDNS/DNS-SD，共提供 DeepSeek 文本、Qwen 图像、GLM 工具调用三项 Mock API。网络发现、HTTPS、认证、SSE、图片字节传输和工具结果回传真实执行；推理为模拟，无需模型、GPU 或云 key。[模型展示说明](docs/model-presentation.md)中的名称不代表实际加载了权重。
+
+## 下载运行
+
+在 [GitHub Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/latest) 选择附件，与同页 `SHA256SUMS` 核对 SHA-256 后解压。
+
+| 运行方式 | 附件 | 前提 |
 |---|---|---|
-| A | DeepSeek R1 Distill Qwen 32B / Qwen2.5-VL 7B | Q4_K_M / BF16；后者支持图像字节接收和摘要 |
-| B | GLM-4-9B-Chat | INT4；函数调用、客户端工具结果回传 |
+| macOS、Linux、Windows 原生进程 | `llm-service-discovery-demo-0.6.0-native.zip` | 对应系统/架构的 Node.js 24+ |
+| Windows 客户端 + 两个 Linux 容器 | `llm-service-discovery-demo-0.6.0-windows-x64-wsl.zip` | Windows x64、Node.js 24+、已有 x64 Ubuntu WSL |
 
-API 均为 Mock，无需模型、GPU 或云额度。网络发现、HTTPS/认证、SSE、图片传输和工具往返真实执行；不提供真实推理或联网搜索。
+两个 ZIP 均带 JavaScript 依赖和插件 tgz；只有 WSL 包带预构建 linux/amd64 镜像。Node.js 与 Harness 需另行安装。GitHub 自动提供的 Source code 包需要先执行 `npm ci --ignore-scripts`。
 
-紧凑的服务列表只显示图像、工具调用等已知特殊能力；型号、版本及量化 / 精度的展示约定见 [模型展示说明](docs/model-presentation.md)。模拟服务在展开详情中说明其性质，列表不再用统一的 Mock / 非 Mock 标签；普通部署使用同一套界面。
+原生包解压后，在目录中运行：
 
-## 下载部署包
+```sh
+node scripts/verify-release-files.mjs
+node packages/lab-controller/cli.mjs list-interfaces
+node packages/lab-controller/cli.mjs native run --runtime .runtime/native --interface YOUR_LAN_IPV4
+```
 
-打开 [GitHub Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/latest)，在 Assets 下载 **llm-service-discovery-demo-0.5.1-windows-x64-wsl.zip**。ZIP 已带 JavaScript 依赖、Harness 插件及预构建 Linux/amd64 服务镜像；GitHub 自动生成的 **Source code** 压缩包不包含这些部署材料。
+将 `YOUR_LAN_IPV4` 替换为列表中的本机局域网 IPv4。保持前台终端开启，在另一终端执行：
 
-解压到长期保留的本地目录。准备好 Windows x64、Node.js 24+ 和已有的 x86-64 Ubuntu WSL 后，在解压目录执行：
+```sh
+node scripts/verify-live.mjs --runtime .runtime/native
+node scripts/verify-lifecycle.mjs --backend native --runtime .runtime/native
+node packages/lab-controller/cli.mjs native stop --runtime .runtime/native
+```
+
+网卡选择、跨设备信任、权限和 Linux Docker 可选路线见 [原生部署](docs/native-quickstart.md)，Mac 远程测试见 [SSH 连接](docs/mac-ssh-validation.md)。首次在本机生成实验 CA、证书和合成 key，重启保留，不修改系统证书库。
+
+WSL 包在 Windows PowerShell 中运行：
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 ```
 
-脚本自动校验、载入镜像，不需要本地构建或 Docker Desktop。首次缺少 Docker static 工具或 Compose 时仍需联网下载；Node、WSL 和 Harness 需自行安装。随后按[插件安装说明](docs/plugin-setup.md)安装 ZIP 内的插件并配置打印出的信任文件和网卡地址。详情见[发行说明](docs/release-notes.md)及 [Windows 快速部署](docs/windows-quickstart.md)。
+脚本校验并载入镜像，缺少 Docker static/Compose 时首次需联网。详见 [Windows 部署](docs/windows-quickstart.md)；停止使用 `scripts/stop-demo.ps1`。两个容器共享 WSL 地址，以端口和路径区分。本路线不能证明 Docker Desktop 的组播可用。
 
-## 从源码启动
+## 接入 Harness
 
-当前实测路线使用**已有的 Ubuntu WSL**，运行项目专用 Docker Engine；两个容器共享 WSL host network/IP，以端口和路径区分服务。不创建新 VM，不使用 Windows 代公告器。
+使用已安装 Harness 自带的 CLI 安装 `vendor/dsh-lan-discovery-0.5.1.tgz`，配置实验信任文件与**客户端本机**网卡。具体见 [插件安装](docs/plugin-setup.md)。Host 兼容版本固定为 **0.2.1-rc.3 / rc.5**；Windows/macOS Desktop、Linux Web Host 评估、服务端独立运行分别验收，实际状态见验证报告。
 
-需要 Windows、Node.js 24+、已有 x86-64 Ubuntu WSL。启动脚本缓存官方 Docker static 工具，缺少 Compose 时下载并校验固定版本插件；运行命令不依赖 Docker Desktop 的 WSL CLI 链接。初次 Node 基础镜像需要预缓存或从已有本地 Docker 引擎导出。插件对应 Harness Desktop 0.2.1-rc.3 和 0.2.1-rc.5。
+打开“局域网服务 / LAN services”，点击一行展开检查、连接与 key 操作。选中不自动连接，收起或切换清除未提交密码。中英文跟随 Harness 语言偏好。发现记录本身不授权向未知服务发送凭据。
 
-```powershell
+**三种认证状态：** DeepSeek 无需 key；首次手动保存 GLM 的合成 key；Qwen-VL 保持待输入。实验 key 位于所选 runtime 的 `presenter/demo-api-keys.txt`，步骤见 [API key 演示](docs/api-key-demo.md)。插件使用 Harness 凭据服务，当前默认 provider 为本地未加密 YAML，不等同于系统 Keychain/secret service。无需真实云服务凭据。
+
+免 key Open Responses 服务是明确实验扩展：草案 -00 要求 `auth=required`。两种方式都校验独立 TLS 信任。
+
+## 开发与验证
+
+```sh
 npm ci --ignore-scripts
 npm test
-.\scripts\doctor.ps1
-.\scripts\start-demo.ps1
-node scripts/verify-live.mjs
+node scripts/verify-components.mjs
+node packages/lab-controller/cli.mjs --help
 ```
 
-按 [Windows 快速部署](docs/windows-quickstart.md) 和 [插件安装说明](docs/plugin-setup.md) 操作。Demo 的 `vendor/` 包含版本化组件安装包，单独取得本仓库即可 `npm ci`，无需旁边再放其他源码仓库。使用已安装 Harness 自带 CLI 安装 `vendor/dsh-lan-discovery-0.5.0.tgz`。Windows 防火墙弹窗需要用户手动处理。
+CI 配置 Windows x64、Linux x64/arm64、macOS x64/arm64 与 Node 24。纯 JavaScript 包无需按系统编译原生扩展。自动测试、真实网络、独立 observer 与 Harness 界面分别记录。不宣称完整 RFC 一致性、IPv6 组播或跨子网发现。
 
-在 Harness 侧栏打开“局域网服务 / LAN services”。初始列表像 Wi-Fi 选择器一样，仅展示服务名称、地址、已知能力和 key 状态；点击一项后再出现检查、连接和 key 输入等操作。每次只展开一项，选中本身不会自动连接；收起或切换服务会清除未提交的密码。插件支持中文和英语，使用 Harness 官方语言服务，优先跟随 Harness 语言偏好，没有偏好时跟随系统语言。能力标签来自已认证的服务声明；信任配置独立初始化，不靠发现记录授权未知服务。
-
-**三种认证状态：** DeepSeek 无需 key；GLM 使用已经保存的 key；Qwen-VL 尚未填写 key。首次准备时，展开 GLM，从 `.runtime/current/presenter/demo-api-keys.txt` 取得其随机演示 key，保留“记住 API key”后验证连接，Qwen-VL 保持未配置。“已保存”仅说明本地有凭据，不表示刚刚连接成功。保存的 key 可跨 Harness 重启恢复，也可取消勾选而仅本次使用。插件采用 Harness 官方凭据服务；当前默认 provider 写入本地未加密 YAML，页面和公告不返回 key。旧环境迁移、错误 key 重试及重置步骤见 [API key 演示说明](docs/api-key-demo.md)。
-
-免 key 的 Open Responses 服务是本 Demo 的明确实验扩展：当前草案 -00 的绑定要求 `auth=required`。两种方式都保留独立 TLS 信任校验。
-
-停止：
-
-```powershell
-.\scripts\stop-demo.ps1
-```
-
-只停止本项目，保留凭据、镜像和专用 daemon 供重启。
-
-## 文档与验证
-
-- [完整实施计划 v0.4](IMPLEMENTATION_PLAN.md)
 - [独立仓库与组件维护](docs/repositories.md)
-- [当前验证报告及待完成项](docs/validation-report.md)
-- [协议与能力扩展的边界](docs/protocol-mapping.md)
-- [IETF 演示步骤](docs/demo-script.md)
-- [容器到 Windows 的网络验证](docs/network-spike.md)
-- [发布准备清单](docs/release-readiness.md)
+- [发行说明](docs/release-notes.md)与[发布准备](docs/release-readiness.md)
+- [演示步骤](docs/demo-script.md)
+- [历史 Windows 网络调查](docs/network-spike.md)
 
-发现核心库、服务端公告器、Harness 插件分别维护为独立源码仓库；本 Demo 只保留 `packages/mock-api` 和 `packages/lab-controller`，通过版本化安装包使用其他组件。四个项目采用 [MIT 许可证](LICENSE)，[四个 GitHub 源码仓库](docs/repositories.md) 可分别克隆；尚未发布 npm 或镜像 registry。
-
-自动测试、真实网络调用、独立 observer、真实 Harness 桌面会话分别验收。不以模拟测试冒充完整桌面验收，不宣称完整 RFC 一致性。国际化与拆分后的实际验收状态以验证报告为准。
+发现核心库、公告器、插件各有独立仓库，Demo 通过 `vendor/` 中版本化包安装，无需相邻源码目录。四项目采用 [MIT](LICENSE)，尚未发布 npm 或镜像 registry。运行目录、证书、key 和用户 profile 不进入发布包。

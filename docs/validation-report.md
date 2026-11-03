@@ -1,6 +1,29 @@
 # 验证报告
 
-更新日期：2026-11-03。当前 Demo 0.5.1 随附插件 0.5.0，使用点击展开的服务列表，保留两个容器、三个服务及免 key、已保存 key、待输入 key 三种状态。各版本的实测范围分别记录如下，历史结果不替代当前版本验收。
+更新日期：2026-11-03。当前 Demo 0.6.0 随附 core/公告器 0.3.1、插件 0.5.1，支持原生两个进程或 Windows/WSL 两容器，共三项服务。各版本的实测范围分别记录；历史结果不替代当前版本验收。
+
+## 0.6.0 跨平台验证
+
+真实 Mac 通过同局域网 SSH 连接，复用用户现有受信主机记录与密钥，在独立用户目录解压官方 Node 24.22.2 arm64（核对官方 SHA-256），没有安装全局 npm 包或改动系统证书。Mac 系统命令返回 macOS 27.2 / Darwin 27.2.0，架构 arm64。Linux 为现有 Ubuntu WSL 的 x64 环境，使用独立目录中的 Node 24.22.2；这不等于独立物理 Linux 主机验收。
+
+| 检查 | 实际结果 |
+|---|---|
+| core / advertiser / plugin 源码、打包和安装 | Windows、Mac arm64、Linux x64：14 / 20 / 49 项组件测试通过；公告器和插件最终 tgz 空缓存离线安装通过 |
+| 五类平台 CI | Windows x64、Linux x64/arm64、macOS arm64/Intel；断言真实 OS/架构。core/公告器另在 Linux x64 验证 Node 22 下限 |
+| Demo 自动测试 | Windows 56/56；Mac/Linux 准备包 53 通过、1 项跳过（没有 PowerShell 的打包子测试）；核心原生/协议测试均执行 |
+| Windows 原生 Node | 真实 mDNS/HTTPS/Responses 24/24；生命周期 7/7，3→2→3 |
+| Mac arm64 原生 Node | 真实 mDNS/HTTPS/Responses 24/24；生命周期 7/7，3→2→3；系统 mDNSResponder 同时运行 |
+| Linux x64 原生 Node | 24/24、生命周期 7/7；停止后同 runtime 重启，凭据与信任保持不变；私密文件权限 0600 |
+| Windows 客户端 → Mac 服务端 | 两台物理机器同局域网，真实发现、独立 TLS 信任和 API 调用 24/24 |
+| Mac 客户端 → Windows 服务端 | 反向跨设备发现及 API 调用 24/24 |
+| 独立 Bonjour 观察 | Mac 系统 `/usr/bin/dns-sd` 观察到 3/3 服务，没有使用项目发现库 |
+| ZIP 平台兼容 | 修复 Windows PowerShell 5.1 的 ZIP 反斜杠条目；统一使用正斜杠，Mac 解压及 266 个准备包文件校验通过 |
+
+24 项检查覆盖免 key、缺失/错误/跨服务 key 拒绝、受信 TLS、模型/能力、流式/非流式文本、图像字节传输与工具结果关联。工具执行器是独立验证脚本，**不是 Harness 原生工具运行时**。跨设备验证只传递客户端实验信任及专门的合成测试 key，没有复制服务端私钥。停止与恢复由实例绑定的回环控制完成，不按磁盘中的任意 PID 杀进程。
+
+Linux 测试暂时停止原项目的两个 WSL 容器，结束后恢复同一容器 ID；未替换其旧运行凭据。Mac/Linux 的组件安装验证与 Demo 实跑分别记录。发布工作流在最终 tag 生成新资产，下载校验后才公开，最终附件的验收结果记录在 Release 说明中。
+
+仍未声称完成：Mac 上 Harness 图形界面的文本/图像/工具会话，Linux Web Host 的 UI/凭据/重启行为，Linux 独立物理网络与 Avahi 共存，macOS Intel/Linux ARM64 实体硬件，Windows ARM64，Mac Docker Desktop 组播或多架构预构建镜像。CI 包验证不能替代这些实机/界面验收。
 
 ## 0.5.1 Release 部署验证
 

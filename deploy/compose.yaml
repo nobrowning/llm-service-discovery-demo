@@ -1,6 +1,6 @@
 name: llm-discovery-demo
 x-node: &node
-  image: llm-discovery-demo:0.5.1
+  image: llm-discovery-demo:0.6.0
   pull_policy: never
   build:
     context: ..

@@ -1,6 +1,6 @@
 import forge from 'node-forge';
 import { randomBytes, createHash } from 'node:crypto';
-import { mkdir, writeFile, access, readFile, rename } from 'node:fs/promises';
+import { mkdir, writeFile, access, readFile, rename, readdir, lstat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { isIP } from 'node:net';
 import { defaultServicesForNode, defaultNodeLabel } from '../mock-api/index.mjs';
@@ -104,19 +104,30 @@ function certificate(keys, subject, issuer, issuerKey, extensions) {
 }
 
 export async function initializeLab({ address, interfaceAddress, runtimeDir = '.runtime/current' }) {
-  if (isIP(address) !== 4 || /^(127\.|0\.|22[4-9]\.|23\d\.)/.test(address)) throw new Error('Use an explicit non-loopback IPv4 address reachable from Windows');
-  if (interfaceAddress && isIP(interfaceAddress) !== 4) throw new Error('Invalid Windows discovery interface address');
+  if (isIP(address) !== 4 || /^(127\.|0\.|22[4-9]\.|23\d\.)/.test(address)) throw new Error('Use an explicit non-loopback IPv4 address reachable from the discovery client');
+  if (interfaceAddress && isIP(interfaceAddress) !== 4) throw new Error('Invalid client discovery interface IPv4 address');
   const directory = path.resolve(runtimeDir);
+  const directoryInfo = await lstat(directory).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+  if (directoryInfo && (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink())) throw new Error('Runtime must be a regular directory, not a file or symbolic link.');
   const configFile = path.join(directory, 'lab.json');
   try {
     await access(configFile);
     const existing = JSON.parse(await readFile(configFile, 'utf8'));
+    if (existing.schema !== 'llm-discovery-demo-lab/v1' || !Array.isArray(existing.nodes)) throw new Error('Existing runtime has an unsupported lab manifest; no files were changed.');
     if (existing.address !== address || existing.interfaceAddress !== (interfaceAddress ?? null)) throw new Error('Existing runtime uses different addresses. Choose a new --runtime directory; do not replace active routes.');
+    for (const file of ['server/lab.json', 'server/server.pem', 'server/server-key.pem', 'server/tokens.json', 'client/trust.json', 'client/ca.pem', 'client/marker.txt']) {
+      const info = await lstat(path.join(directory, file)).catch(() => null);
+      if (!info?.isFile() || info.isSymbolicLink()) throw new Error('Existing runtime is incomplete or contains redirected files. Preserve it and choose a new --runtime directory.');
+    }
     const authMigrationRequired = existing.nodes?.some(node => node.services?.some(service => service.auth !== DEMO_AUTH[service.id])) ?? true;
     const existingIds = existing.nodes?.flatMap(node => node.services?.map(service => service.id) ?? []) ?? [];
     const topologyMigrationRequired = existingIds.length !== DEMO_SERVICE_IDS.length || !DEMO_SERVICE_IDS.every(id => existingIds.includes(id));
     return { configFile, trustFile: path.join(directory, 'client', 'trust.json'), reused: true, authMigrationRequired, topologyMigrationRequired };
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (directoryInfo && (await readdir(directory)).length) throw new Error('Runtime directory is nonempty but has no lab.json. Preserve it and choose a new --runtime directory; existing files are never overwritten.');
+  await mkdir(directory, { recursive: true });
+  const initializing = path.join(directory, '.initializing');
+  await writeFile(initializing, 'Runtime initialization in progress. Preserve this directory if initialization fails.\n', { flag: 'wx', mode: 0o600 });
   await mkdir(path.join(directory, 'server'), { recursive: true });
   await mkdir(path.join(directory, 'client'), { recursive: true });
   const runId = randomBytes(4).toString('hex');
@@ -162,5 +173,6 @@ export async function initializeLab({ address, interfaceAddress, runtimeDir = '.
   await writeFile(path.join(directory, 'server', 'lab.json'), JSON.stringify(config, null, 2));
   const demoKeysFile = demoKeysPath(directory);
   await replaceIfChanged(demoKeysFile, demoKeysText(config, tokens), 0o600);
+  await unlink(initializing);
   return { configFile, trustFile: path.join(directory, 'client', 'trust.json'), demoKeysFile, reused: false, authMigrationRequired: false, topologyMigrationRequired: false };
 }

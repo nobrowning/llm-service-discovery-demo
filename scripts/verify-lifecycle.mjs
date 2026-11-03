@@ -1,5 +1,5 @@
-/** Windows/WSL lifecycle acceptance: container-owned mDNS 3 -> 2 -> 3.
- * The only mutation is SIGUSR2 to this lab's verified node-a container.
+/** Real mDNS lifecycle acceptance: 3 -> 2 -> 3.
+ * WSL signals its verified container; native mode uses authenticated local IPC.
  */
 import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
@@ -11,28 +11,36 @@ import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createDiscoveryClient } from '@llm-discovery/discovery-core';
 import { loadTrust, authorizeCandidate, createPinnedTransport, canonicalBaseURL } from 'dsh-lan-discovery/trust';
+import { requestNative } from '../packages/lab-controller/native-control.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const options = { runtime: resolve(root, '.runtime/current'), output: resolve(root, 'artifacts/lifecycle-verification.json'), distro: 'Ubuntu', timeoutMs: 30000 };
+const options = { runtime: resolve(root, '.runtime/current'), output: resolve(root, 'artifacts/lifecycle-verification.json'), distro: 'Ubuntu', backend: 'wsl', timeoutMs: 30000 };
 const args = process.argv.slice(2);
+if (args.includes('--help')) {
+  console.log('Usage: node scripts/verify-lifecycle.mjs [--backend wsl|native] [--runtime DIR] [--output FILE] [--distro Ubuntu] [--timeout-ms N]');
+  process.exit(0);
+}
 for (let index = 0; index < args.length; index++) {
   const flag = args[index], value = args[++index];
   if (!value) throw new Error('An option value is required.');
   if (flag === '--runtime') options.runtime = resolve(value);
   else if (flag === '--output') options.output = resolve(value);
   else if (flag === '--distro') options.distro = value;
+  else if (flag === '--backend') options.backend = value;
   else if (flag === '--timeout-ms') options.timeoutMs = Number(value);
-  else throw new Error('Usage: node scripts/verify-lifecycle.mjs [--runtime DIR] [--output FILE] [--distro Ubuntu] [--timeout-ms N]');
+  else throw new Error('Usage: node scripts/verify-lifecycle.mjs [--backend wsl|native] [--runtime DIR] [--output FILE] [--distro Ubuntu] [--timeout-ms N]');
 }
+if (!['wsl', 'native'].includes(options.backend)) throw new Error('--backend must be wsl or native.');
 if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1000 || options.timeoutMs > 120000) throw new Error('Timeout must be 1000..120000 ms.');
 const started = Date.now();
-const report = { schema: 'llm-discovery-demo-lifecycle-verification/v1', startedAt: new Date(started).toISOString(), status: 'failed', execution: { discovery: 'real-mdns-udp', mutation: 'container-node-a-SIGUSR2-only', hostAdvertiser: false, desktopSessionExecuted: false }, sequence: [], snapshots: [], events: [], checks: [] };
+const report = { schema: 'llm-discovery-demo-lifecycle-verification/v1', startedAt: new Date(started).toISOString(), status: 'failed', execution: { backend: options.backend, discovery: 'real-mdns-udp', mutation: options.backend === 'native' ? 'authenticated-native-node-a-IPC-only' : 'container-node-a-SIGUSR2-only', hostAdvertiser: options.backend === 'native', desktopSessionExecuted: false }, sequence: [], snapshots: [], events: [], checks: [] };
 const execFileAsync = promisify(execFile);
-let helper, containerId, expected = [], discovery, unsubscribe, textTransport, visionTransport, signalMayHaveBeenSent = false;
+let helper, containerId, nativeInstanceId, expected = [], discovery, unsubscribe, textTransport, visionTransport, signalMayHaveBeenSent = false;
 const category = error => error?.code === 'ERR_ASSERTION' ? 'assertion-failed' : /HTTP (\d{3})/.exec(error?.message ?? '')?.[1] ? `http-${/HTTP (\d{3})/.exec(error.message)[1]}` : 'runtime-or-network-error';
 const wsl = async (...args) => (await execFileAsync('wsl.exe', ['-d', options.distro, '-u', 'root', '--exec', ...args], { windowsHide: true, timeout: 15000, maxBuffer: 256 * 1024 })).stdout.trim();
 const docker = (...args) => wsl('sh', helper, 'docker', ...args);
 async function toggleText() {
+  if (options.backend === 'native') { await requestNative(options.runtime, 'toggle-text', { expectedInstanceId: nativeInstanceId }); return; }
   // No shell string interpolation, no default daemon, and no process-wide signal.
   await docker('kill', '--signal', 'SIGUSR2', containerId);
 }
@@ -71,7 +79,7 @@ async function textIsReady() {
 }
 
 try {
-  assert.equal(process.platform, 'win32', 'This lifecycle driver targets the isolated Windows/WSL experiment.');
+  if (options.backend === 'wsl') assert.equal(process.platform, 'win32', 'Use --backend native for the native Node deployment; the wsl backend requires Windows.');
   const lab = JSON.parse(await readFile(resolve(options.runtime, 'lab.json'), 'utf8'));
   assert.equal(lab.schema, 'llm-discovery-demo-lab/v1', 'Unsupported lab schema.');
   report.runId = lab.runId;
@@ -80,7 +88,20 @@ try {
   assert.deepEqual(expected.map(service => service.id).sort(), ['a-text', 'a-vision', 'b-tools'], 'Unexpected experiment service set.');
   const trust = await loadTrust(resolve(options.runtime, 'client/trust.json'));
   const serverKeys = JSON.parse(await readFile(resolve(options.runtime, 'server/tokens.json'), 'utf8'));
-  await check('verify-isolated-node-a-target', async () => {
+  if (options.backend === 'native') await check('verify-native-node-a-target', async () => {
+    const status = await requestNative(options.runtime, 'status');
+    assert.equal(status.backend, 'native');
+    assert.equal(status.state, 'running');
+    assert.equal(status.runId, lab.runId);
+    assert.equal(status.address, lab.address);
+    assert.equal(status.interfaceAddress, lab.interfaceAddress);
+    assert.equal(typeof status.instanceId, 'string');
+    nativeInstanceId = status.instanceId;
+    assert.deepEqual(status.nodes.map(node => [node.id, node.ready]), [['A', true], ['B', true]]);
+    assert.deepEqual([...status.services].sort(), expected.map(service => service.id).sort());
+    return { backend: 'native', runtimeIdentityVerified: true, privateParentIpc: true };
+  });
+  else await check('verify-isolated-node-a-target', async () => {
     const wslRoot = await wsl('wslpath', '-a', '-u', root);
     const wslRuntime = await wsl('wslpath', '-a', '-u', options.runtime);
     assert.ok(wslRoot.startsWith('/') && wslRuntime.startsWith('/'), 'Could not map workspace paths into WSL.');

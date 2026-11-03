@@ -48,8 +48,10 @@ function Read-ReleaseImage {
     if ($manifest.schema -isnot [string] -or $manifest.schema -cne 'llm-discovery-demo-release/v1' -or $manifest.version -isnot [string] -or $manifest.version -cne $package.version) {
         throw 'The release manifest schema/version does not match this Demo package. Extract the complete release again.'
     }
-    if ($manifest.image.tag -isnot [string] -or $manifest.image.tag -cne 'llm-discovery-demo:0.5.1') {
-        throw 'The release image tag must be llm-discovery-demo:0.5.1 for this launcher.'
+    if ($manifest.platform -eq 'native-node') { throw 'This is a native release. Use node packages/lab-controller/cli.mjs native run; see docs/native-quickstart.md.' }
+    $expectedTag = 'llm-discovery-demo:' + $package.version
+    if ($manifest.image.tag -isnot [string] -or $manifest.image.tag -cne $expectedTag) {
+        throw "The release image tag must be $expectedTag for this launcher."
     }
     if ($manifest.image.file -isnot [string] -or $manifest.image.file -cnotmatch '^images/[A-Za-z0-9][A-Za-z0-9._-]*\.tar\.gz$') {
         throw 'The release image must be a relative images/<filename>.tar.gz path without parent traversal.'

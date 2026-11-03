@@ -1,6 +1,6 @@
 # IETF 五分钟现场演示（0.5.0）
 
-Windows 原生 Harness + 已有 Ubuntu WSL 内两个容器、三个 API。先完成 [快速部署](windows-quickstart.md)、[插件安装](plugin-setup.md) 和 [API key 三状态准备](api-key-demo.md)。下载、构建、信任初始化和预保存 GLM 不计入五分钟。
+两个节点、三个 API，可用 [macOS/Linux/Windows 原生进程](native-quickstart.md)或 [Windows/WSL 两容器](windows-quickstart.md)。先完成部署、[插件安装](plugin-setup.md)和 [API key 三状态准备](api-key-demo.md)。下文历史命令若使用 `.runtime/current`，原生路线改为实际 runtime（例如 `.runtime/native`）；生命周期命令添加 `--backend native`。下载、构建、信任初始化和预保存 GLM 不计入五分钟。Linux 的 Web Host 界面须单独验收，服务端测试通过不自动代表完整 UI 可用。
 
 讲述范围：真实 mDNS 发现、HTTPS/SSE、图像字节传输与客户端工具往返；模型响应全部是 Mock。两容器共享 WSL IP，通过端口与路径区分服务，不声称各有一个 LAN IP。
 

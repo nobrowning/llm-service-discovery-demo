@@ -3,8 +3,14 @@ on: [push, pull_request]
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - { os: ubuntu-24.04, platform: linux, arch: x64 }
+          - { os: ubuntu-24.04-arm, platform: linux, arch: arm64 }
+          - { os: windows-2022, platform: win32, arch: x64 }
+          - { os: macos-15, platform: darwin, arch: arm64 }
+          - { os: macos-15-intel, platform: darwin, arch: x64 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -13,9 +19,25 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Check actual runner platform
+        env:
+          EXPECT_PLATFORM: ${{ matrix.platform }}
+          EXPECT_ARCH: ${{ matrix.arch }}
+        run: node -e "if(process.platform!==process.env.EXPECT_PLATFORM || process.arch!==process.env.EXPECT_ARCH) throw Error('Unexpected runner platform'); console.log(process.platform,process.arch,process.version)"
       - run: npm test
       - run: node scripts/verify-components.mjs
       - run: node scripts/prepare-offline-image.mjs
+      - run: node packages/lab-controller/cli.mjs --help
+      - run: node packages/lab-controller/cli.mjs --version
+      - run: node packages/lab-controller/cli.mjs list-interfaces
+      - name: Package and verify native deployment
+        shell: pwsh
+        run: |
+          ./scripts/package-release.ps1 -Platform native -OutputDirectory .release
+          $zip = Get-ChildItem .release/*.zip | Select-Object -First 1
+          Expand-Archive -LiteralPath $zip.FullName -DestinationPath '.release/extracted native'
+          node '.release/extracted native/scripts/verify-release-files.mjs'
+          node '.release/extracted native/scripts/verify-components.mjs'
       - name: Verify Windows release launcher
         if: runner.os == 'Windows'
         shell: powershell

@@ -2,13 +2,13 @@
 
 项目采用 MIT 许可证，拆分为发现核心库、服务端公告器、Harness 插件和 Demo 四个独立源码仓库。源码仓库链接见 [仓库与依赖](repositories.md)；尚未发布 npm 或镜像 registry。
 
-Demo 通过 `vendor/*.tgz` 使用发现核心库 / 公告器 0.3.0 和 Harness 插件 0.5.0 安装包，并用 lockfile 固定依赖；只取得 Demo 仓库即可执行 `npm ci`，无需其他仓库位于相邻目录。插件安装与配置见 [plugin-setup.md](plugin-setup.md)，组件维护和更新方式见 [repositories.md](repositories.md)。
+Demo 通过 `vendor/*.tgz` 使用发现核心库 / 公告器 0.3.1 和 Harness 插件 0.5.1 安装包，并用 lockfile 固定依赖；只取得 Demo 仓库即可执行 `npm ci`，无需其他仓库位于相邻目录。插件安装与配置见 [plugin-setup.md](plugin-setup.md)，组件维护和更新方式见 [repositories.md](repositories.md)。
 
 ## 已准备
 
-- GitHub Release 分发流程：组件提供 tgz 与 SHA256SUMS；Demo 提供带 JavaScript 依赖、预构建镜像和文件校验值的 Windows/WSL ZIP。tag workflow 先生成草稿，下载验收后发布。
-- Demo 0.5.1 启动器校验发行镜像 SHA-256、tag 与 image ID，再载入专用 daemon；部署 ZIP 不需本地构建和 Node 基础镜像，首次工具下载仍需网络。
-- 中英文 README、实现计划、协议映射、演示脚本与 Windows 快速启动。
+- GitHub Release 分发流程：组件提供 tgz 与 SHA256SUMS；Demo 提供三平台 native ZIP，以及另带 linux/amd64 镜像的 Windows/WSL ZIP。tag workflow 先生成草稿，下载验收后发布。
+- Demo 0.6.0 启动器校验发行镜像 SHA-256、tag 与 image ID，再载入专用 daemon；部署 ZIP 不需本地构建和 Node 基础镜像，首次工具下载仍需网络。
+- 中英文 README、原生 macOS/Linux/Windows 指令、Mac SSH 连接说明、插件平台限制、演示脚本与 Windows 快速启动。
 - 免 key / 已保存 key / 待输入 key 的三服务演示；密码输入、错误重试、Harness 凭据持久化与可选仅本次使用，独立 TLS 信任。当前默认凭据 provider 是本地未加密 YAML，文档说明此限制。
 - 先浏览、再展开单项的服务选择流程；密码框及管理操作按需显示，收起或切换会清除未提交密码。主列表仅显示通用服务与凭据状态，模拟性质放在明确声明的服务详情中，普通服务无需“非 Mock”标签。
 - 已选定 MIT；各仓库保留许可证和版权声明。
@@ -22,7 +22,7 @@ Demo 通过 `vendor/*.tgz` 使用发现核心库 / 公告器 0.3.0 和 Harness �
 
 ## 发布前完成
 
-1. 扩展验证：在第二台干净机器按文档复现。已有 x86-64 WSL、Windows Node 24+ 是部署前提；Release ZIP 不需准备 Node 基础镜像。不能用本机新目录验证替代第二台机器验收。
+1. 逐平台扩展验证：Mac arm64 第二台机器的原生服务和 Windows↔Mac 双向网络已实测；Mac Harness UI、Linux Web Host、独立物理 Linux/Avahi 仍须单独验收。已有 x64 WSL 仅为 Windows 容器路线的前提，native 路线不需要 WSL。
 2. 对每个待发布版本执行独立安装、测试、`npm pack` 内容审查和 Demo 集成验证；记录实际 Harness 的中英文切换及打包插件接入结果。不可用开发 checkout 测试代替 tarball 安装测试。
 3. 后续版本发布前确认远程分支、标签与发行包对应。四个公开源码仓库统一位于 `nobrowning` 账号，链接见仓库说明。
 4. 若转向 npm registry 分发，先确认 package scope/名称可用，再按核心库、公告器/插件、Demo 的依赖顺序发布并更新 lockfile；本地 tarball 不表示已经发布 npm。

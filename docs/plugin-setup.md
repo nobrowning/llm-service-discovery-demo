@@ -1,27 +1,38 @@
 # Harness 插件安装
 
-插件源码位于 [dsh-lan-discovery](https://github.com/nobrowning/dsh-lan-discovery)。Demo 随附经过版本锁定的 `vendor/dsh-lan-discovery-0.5.0.tgz`，可直接安装，不需要另克隆插件仓库，也不依赖本机开发目录。当前明确支持 Harness Desktop **0.2.1-rc.3 和 0.2.1-rc.5**；两个版本分别完成的桌面检查见[验证报告](validation-report.md)。
+插件源码位于 [dsh-lan-discovery](https://github.com/nobrowning/dsh-lan-discovery)。Demo 随附经过版本锁定的 `vendor/dsh-lan-discovery-0.5.1.tgz`，可直接安装，不需要另克隆插件仓库。Host 兼容版本为 **0.2.1-rc.3 和 0.2.1-rc.5**；平台、Host 与实际界面验收范围见[验证报告](validation-report.md)。
 
 ## 安装与配置
 
-先运行 Demo 根目录的 `scripts/start-demo.ps1`；Release 部署 ZIP 已带 JavaScript 依赖与镜像，从源码克隆时才需要先执行 `npm ci --ignore-scripts`。完全退出 Harness，然后用该 Desktop 安装自带的 CLI 添加包。替换下面的安装路径，避免用另外安装的 CLI 修改 Desktop profile：
+先按[原生部署](native-quickstart.md)启动；Windows/WSL 路线使用 `scripts/start-demo.ps1`。Release ZIP 已带 JavaScript 依赖，从源码克隆时先执行 `npm ci --ignore-scripts`。完全退出 Harness，再用该 Desktop 安装自带的 CLI 添加包。替换下面的安装路径：
 
 ```powershell
 $dsh = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-& $dsh plugin --profile desktop add (Join-Path (Get-Location) 'vendor/dsh-lan-discovery-0.5.0.tgz')
+& $dsh plugin --profile desktop add (Join-Path (Get-Location) 'vendor/dsh-lan-discovery-0.5.1.tgz') --ignore-scripts
 ```
 
-配置 profile 中已有的 `lan-discovery` 行，保留其他字段与插件。使用启动脚本打印的信任文件路径、`doctor` 给出的 Windows 接口地址：
+macOS 使用已安装 `.app` 内的 CLI；以实际应用名为准：
+
+```sh
+DSH='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh'
+"$DSH" plugin --profile desktop add "$PWD/vendor/dsh-lan-discovery-0.5.1.tgz" --ignore-scripts
+```
+
+不要假定 npm 全局 CLI 与桌面 Host 版本一致。Linux 可单独运行发现服务与验证器；官方 Desktop 未提供 Linux 发布目标，Web Host 的 UI/生命周期/凭据能力需单独验收，详见插件仓库的 [平台说明](https://github.com/nobrowning/dsh-lan-discovery/blob/main/docs/platform-support.md)。
+
+配置 profile 中已有的 `lan-discovery` 行，保留其他字段与插件。使用启动时打印的信任文件路径，以及客户端自己所选接口的 IPv4：
 
 ```yaml
 - id: lan-discovery
   config:
     trustFile: 'C:\Path\To\Demo\.runtime\current\client\trust.json'
-    interfaceAddress: 'WINDOWS_VIRTUAL_LAN_IP'
+    interfaceAddress: 'CLIENT_LOCAL_IPV4'
     networkId: 'ietf-demo'
     autoStart: true
     demoMode: true
 ```
+
+原生路线默认示例 runtime 为 `.runtime/native`；Unix 上改为真实绝对路径，例如 `/Users/alice/demo/.runtime/native/client/trust.json`。配置不会展开 `~`、`$HOME` 或 `%USERPROFILE%`。跨设备使用服务端通过可信通道提供的 `client/` 信任目录，接口则选择客户端自己的 LAN 地址。默认状态文件写在 trustFile 同目录；若信任文件放在只读目录，显式配置可写的绝对 `stateFile`，不要放宽服务端私钥权限。
 
 `demoMode: true` 仅用于本 Demo：开启固定的只读 marker 工具和 Mock 请求上下文标记。插件独立安装时默认关闭，读取通用实验能力接口 `/_llm/capabilities`。能力接口与发现协议的关系见独立插件仓库的 `docs/service-contract.md`。
 

@@ -11,15 +11,23 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const options = {};
 for (let i = 0; i < args.length; i += 2) {
-  if (!['--image', '--image-id', '--output'].includes(args[i]) || !args[i + 1]) throw new Error('Usage: node scripts/prepare-release.mjs --image ARCHIVE.tar.gz --image-id sha256:... --output NEW_DIRECTORY');
+  if (!['--platform', '--image', '--image-id', '--output'].includes(args[i]) || !args[i + 1]) throw new Error('Usage: node scripts/prepare-release.mjs --platform native|windows-x64-wsl [--image ARCHIVE.tar.gz --image-id sha256:...] --output NEW_DIRECTORY');
   options[args[i].slice(2)] = args[i + 1];
 }
-if (!options.image || !options.output || !/^sha256:[a-f0-9]{64}$/.test(options['image-id'] ?? '')) throw new Error('Image archive, Docker image ID and a new output directory are required.');
+const platform = options.platform ?? 'windows-x64-wsl';
+if (!['native', 'windows-x64-wsl'].includes(platform) || !options.output) throw new Error('A supported platform and a new output directory are required.');
+if (platform === 'native' && (options.image || options['image-id'])) throw new Error('The native release does not use a Docker image.');
+if (platform !== 'native' && (!options.image || !/^sha256:[a-f0-9]{64}$/.test(options['image-id'] ?? ''))) throw new Error('The WSL release requires an image archive and Docker image ID.');
 const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 const components = JSON.parse(await readFile(path.join(root, 'vendor/manifest.json'), 'utf8'));
+for (const component of components.components) {
+  if (pkg.dependencies[component.name] !== `file:vendor/${component.file}`) throw new Error(`Component dependency does not match its manifest: ${component.name}`);
+  const installed = JSON.parse(await readFile(path.join(root, 'node_modules', component.name, 'package.json'), 'utf8'));
+  if (installed.name !== component.name || installed.version !== component.version) throw new Error(`Installed component version mismatch: ${component.name}; run npm ci before packaging.`);
+}
 const destination = path.resolve(options.output);
-const imagePath = path.resolve(options.image);
-if (!(await lstat(imagePath)).isFile() || !imagePath.endsWith('.tar.gz')) throw new Error('Expected a regular .tar.gz Docker image archive');
+const imagePath = options.image && path.resolve(options.image);
+if (imagePath && (!(await lstat(imagePath)).isFile() || !imagePath.endsWith('.tar.gz'))) throw new Error('Expected a regular .tar.gz Docker image archive');
 await mkdir(destination); // Fail rather than merge with a previous, possibly contaminated output.
 const hashFile = async file => {
   const hash = createHash('sha256');
@@ -62,16 +70,16 @@ for (const dependency of ['thunky', '@leichtgewicht/ip-codec']) {
   if (!pkg.dependencies[dependency]) await copyTree(path.join(root, 'node_modules', dependency), path.join('node_modules', dependency));
 }
 const imageRelative = `images/llm-discovery-demo-${pkg.version}.tar.gz`;
-await copy(imagePath, imageRelative);
+if (imagePath) await copy(imagePath, imageRelative);
 const manifest = {
   schema: 'llm-discovery-demo-release/v1', version: pkg.version,
   sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
-  platform: 'windows-x64-wsl-ubuntu-amd64',
-  image: { file: imageRelative, tag: `llm-discovery-demo:${pkg.version}`, id: options['image-id'], sha256: hashes[imageRelative] },
-  prerequisites: { node: '>=24', wsl: 'existing x86-64 Ubuntu', harness: ['0.2.1-rc.3', '0.2.1-rc.5'], firstStartNetwork: 'Docker static tools and Compose are downloaded when absent' },
+  platform: platform === 'native' ? 'native-node' : 'windows-x64-wsl-ubuntu-amd64',
+  ...(imagePath ? { image: { file: imageRelative, tag: `llm-discovery-demo:${pkg.version}`, id: options['image-id'], sha256: hashes[imageRelative] } } : { systems: ['darwin', 'linux', 'win32'], architectures: ['arm64', 'x64'] }),
+  prerequisites: { node: '>=24', ...(imagePath ? { wsl: 'existing x86-64 Ubuntu', firstStartNetwork: 'Docker static tools and Compose are downloaded when absent' } : {}), harness: ['0.2.1-rc.3', '0.2.1-rc.5'] },
   components: components.components,
 };
 await writeFile(path.join(destination, 'release-manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 hashes['release-manifest.json'] = await hashFile(path.join(destination, 'release-manifest.json'));
 await writeFile(path.join(destination, 'SHA256SUMS'), Object.entries(hashes).sort(([a], [b]) => a.localeCompare(b)).map(([file, digest]) => `${digest}  ${file}\n`).join(''));
-console.log(JSON.stringify({ directory: destination, version: pkg.version, files: Object.keys(hashes).length, imageId: manifest.image.id, runtimeStateIncluded: false }));
+console.log(JSON.stringify({ directory: destination, version: pkg.version, platform: manifest.platform, files: Object.keys(hashes).length, imageId: manifest.image?.id, runtimeStateIncluded: false }));

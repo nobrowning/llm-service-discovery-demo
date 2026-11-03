@@ -1,0 +1,15 @@
+# Optional native Linux Docker Engine overlay. Keep private runtime files at 0600;
+# run the containers as the host user that owns them instead of widening access.
+services:
+  node-a:
+    user: "${DEMO_UID:?Set DEMO_UID to id -u}:${DEMO_GID:?Set DEMO_GID to id -g}"
+    volumes:
+      - "${DEMO_SERVER_DIR:?Set absolute server directory}:/lab:ro"
+    environment:
+      MDNS_INTERFACE: "${DEMO_INTERFACE:?Set host LAN IPv4}"
+  node-b:
+    user: "${DEMO_UID:?Set DEMO_UID to id -u}:${DEMO_GID:?Set DEMO_GID to id -g}"
+    volumes:
+      - "${DEMO_SERVER_DIR:?Set absolute server directory}:/lab:ro"
+    environment:
+      MDNS_INTERFACE: "${DEMO_INTERFACE:?Set host LAN IPv4}"

@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $report = & (Join-Path $PSScriptRoot 'doctor.ps1') -Distro $Distro -RuntimeDir $RuntimeDir -DockerContext $DockerContext -AsObject
 if (-not $report.ReadyToStart) { throw ($report.Problems -join "`n") }
-$image = 'llm-discovery-demo:0.5.1'
+$image = 'llm-discovery-demo:' + (Get-Content -LiteralPath (Join-Path $PSScriptRoot '../package.json') -Raw | ConvertFrom-Json).version
 $releaseImage = $report.ReleaseImage
 $useReleaseImage = $null -ne $releaseImage
 $socket = 'unix:///var/tmp/llm-discovery-docker-0/docker.sock'
