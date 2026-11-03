@@ -1,6 +1,18 @@
 # 验证报告
 
-更新日期：2026-11-03。结论：**本机快速部署与实际 Harness 桌面流程已通过：容器自行公告、四服务发现、能力筛选、一键接入、文本/图片/原生工具往返，以及断开恢复默认模型。** 各版本的实测范围分别记录如下。
+更新日期：2026-11-03。当前 0.4.0 使用两个容器、三个服务，展示免 key、已保存 key、待输入 key。各版本的实测范围分别记录如下，历史结果不替代当前版本验收。
+
+## 0.4.0 三状态与持久化验收
+
+插件接入 Harness 官方 credentials record API，仅保存 `lan-discovery/service-<identity>` 自有记录。默认勾选记住 key，取消后仅本次运行有效。其存储保护沿用 Harness provider；当前默认 provider 为本地未加密 YAML。API key 不进入 UI 状态、浏览器存储、日志、普通配置或恢复 journal。
+
+本轮插件 **43/43**、Demo **42/42** 测试通过。新增覆盖：保存后重新创建控制器可恢复、错误替换不覆盖旧 key、保存失败不声称成功、从保存切换为仅会话会删除持久副本、身份变化不复用 key、服务离线后可清除旧凭据、存储不可用降级为仅会话，以及中英 UI 三种状态。核心与公告器未变更。
+
+本机显式迁移旧 runtime，保留 run ID、CA、证书和原 key 文件；停止并移除本项目旧 C 容器，A/B 容器自行公告三个服务。真实网络 **24/24** 检查通过，包括受保护 API 的缺 key、错 key、跨服务 key 拒绝，正确 key 下的文本、图像及工具往返。生命周期 **7/7**，真实 mDNS 数量为 **3→2→3**，文本服务撤回期间同节点视觉 API 继续响应。
+
+通过 Desktop 自带 CLI 安装插件 0.4.0，已安装 controller 与源码 SHA-256 一致。在 Harness rc.5 原生界面，GLM 输入本机合成 key 并勾选记住，验证成功后显示已保存；断开后完整退出，再启动时 GLM 仍显示已保存、DeepSeek 免 key、Qwen-VL 输入框为空，原默认模型保持正常。重启后不再输入 key，直接连接 GLM 并发送测试消息，实际收到 Node B Mock 响应。未读取或直接编辑 Harness 的用户凭据文件；保存通过官方 provider 完成。
+
+其他人首次部署时按 [API key 演示步骤](api-key-demo.md) 在 UI 保存一次 GLM key；仓库不预置任何通用密码。当前网络报告为本机 `artifacts/live-verification.json` 与 `artifacts/lifecycle-verification.json`，运行时材料不会提交。
 
 ## 0.3.1 与 Harness rc.5 复验
 

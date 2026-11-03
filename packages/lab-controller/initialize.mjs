@@ -6,6 +6,7 @@ import { isIP } from 'node:net';
 import { defaultServicesForNode, defaultNodeLabel } from '../mock-api/index.mjs';
 
 export const DEMO_AUTH = Object.freeze({ 'a-text': 'none', 'a-vision': 'required', 'b-tools': 'required', 'c-basic': 'none' });
+export const DEMO_SERVICE_IDS = Object.freeze(['a-text', 'a-vision', 'b-tools']);
 const demoKeysPath = directory => path.join(directory, 'presenter', 'demo-api-keys.txt');
 const json = value => `${JSON.stringify(value, null, 2)}\n`;
 
@@ -42,6 +43,18 @@ async function replaceIfChanged(file, content, mode) {
 
 /** Explicit offline migration only; never called by initialization or startup. */
 export async function migrateAuthDemo({ runtimeDir = '.runtime/current' } = {}) {
+  return migrateDemo({ runtimeDir, threeStates: false });
+}
+
+/** Remove the retired fourth service without replacing any private material.
+ * This updates topology and auth policy only; saving a client key is a separate,
+ * explicit presenter action through the plugin credential store.
+ */
+export async function migrateThreeStateDemo({ runtimeDir = '.runtime/current' } = {}) {
+  return migrateDemo({ runtimeDir, threeStates: true });
+}
+
+async function migrateDemo({ runtimeDir, threeStates }) {
   const directory = path.resolve(runtimeDir);
   const configFile = path.join(directory, 'lab.json');
   const serverConfigFile = path.join(directory, 'server', 'lab.json');
@@ -49,10 +62,18 @@ export async function migrateAuthDemo({ runtimeDir = '.runtime/current' } = {}) 
   const [config, serverConfig, trust, tokens] = await Promise.all([configFile, serverConfigFile, trustFile, path.join(directory, 'server', 'tokens.json')].map(async file => JSON.parse(await readFile(file, 'utf8'))));
   if (config.schema !== 'llm-discovery-demo-lab/v1' || !Array.isArray(config.nodes) || JSON.stringify(config) !== JSON.stringify(serverConfig)) throw new Error('Migration requires matching client/server lab manifests. Preserve this runtime and resolve the mismatch first.');
   if (trust.schema !== 'llm-discovery-demo-trust/v1' || !Array.isArray(trust.services)) throw new Error('Migration requires an existing Demo trust document.');
-  const services = config.nodes.flatMap(node => node.services.map(service => ({ node, service })));
-  if (services.length !== 4 || new Set(services.map(({ service }) => service.id)).size !== 4 || services.some(({ service }) => !Object.hasOwn(DEMO_AUTH, service.id))) throw new Error('Migration supports the four named Demo services only.');
+  let services = config.nodes.flatMap(node => node.services.map(service => ({ node, service })));
+  const ids = services.map(({ service }) => service.id);
+  if (![3, 4].includes(services.length) || new Set(ids).size !== services.length || !DEMO_SERVICE_IDS.every(id => ids.includes(id)) || services.some(({ service }) => !Object.hasOwn(DEMO_AUTH, service.id))) throw new Error('Migration supports the three named Demo services and optional legacy c-basic only.');
   const endpoints = services.map(({ node, service }) => `https://${node.hostname}:${node.port}${service.basePath}`);
-  if (new Set(endpoints).size !== 4 || trust.services.length !== 4 || endpoints.some(endpoint => trust.services.filter(entry => entry.baseURL === endpoint).length !== 1)) throw new Error('Migration requires an exact independent trust entry for each Demo endpoint.');
+  if (new Set(endpoints).size !== services.length || trust.services.length !== services.length || endpoints.some(endpoint => trust.services.filter(entry => entry.baseURL === endpoint).length !== 1)) throw new Error('Migration requires an exact independent trust entry for each Demo endpoint.');
+  if (threeStates) {
+    const retired = services.filter(({ service }) => !DEMO_SERVICE_IDS.includes(service.id));
+    const retiredEndpoints = new Set(retired.map(({ node, service }) => `https://${node.hostname}:${node.port}${service.basePath}`));
+    config.nodes = config.nodes.map(node => ({ ...node, services: node.services.filter(service => DEMO_SERVICE_IDS.includes(service.id)) })).filter(node => node.services.length);
+    trust.services = trust.services.filter(entry => !retiredEndpoints.has(entry.baseURL));
+    services = config.nodes.flatMap(node => node.services.map(service => ({ node, service })));
+  }
   for (const { node, service } of services) {
     service.auth = DEMO_AUTH[service.id];
     const entry = trust.services.find(entry => entry.baseURL === `https://${node.hostname}:${node.port}${service.basePath}`);
@@ -66,7 +87,7 @@ export async function migrateAuthDemo({ runtimeDir = '.runtime/current' } = {}) 
   const files = [[configFile, json(config)], [serverConfigFile, json(config)], [trustFile, json(trust)], [demoKeysFile, keyText, 0o600]];
   let changed = false;
   for (const [file, content, mode] of files) changed = await replaceIfChanged(file, content, mode) || changed;
-  return { configFile, trustFile, demoKeysFile, changed, services: services.map(({ service }) => ({ id: service.id, auth: service.auth })), credentialsPrinted: false };
+  return { configFile, trustFile, demoKeysFile, changed, services: services.map(({ service }) => ({ id: service.id, auth: service.auth })), credentialsPrinted: false, ...(threeStates ? { topology: 'three-services-two-nodes', savedKeySetupRequired: true } : {}) };
 }
 
 function certificate(keys, subject, issuer, issuerKey, extensions) {
@@ -92,12 +113,14 @@ export async function initializeLab({ address, interfaceAddress, runtimeDir = '.
     const existing = JSON.parse(await readFile(configFile, 'utf8'));
     if (existing.address !== address || existing.interfaceAddress !== (interfaceAddress ?? null)) throw new Error('Existing runtime uses different addresses. Choose a new --runtime directory; do not replace active routes.');
     const authMigrationRequired = existing.nodes?.some(node => node.services?.some(service => service.auth !== DEMO_AUTH[service.id])) ?? true;
-    return { configFile, trustFile: path.join(directory, 'client', 'trust.json'), reused: true, authMigrationRequired };
+    const existingIds = existing.nodes?.flatMap(node => node.services?.map(service => service.id) ?? []) ?? [];
+    const topologyMigrationRequired = existingIds.length !== DEMO_SERVICE_IDS.length || !DEMO_SERVICE_IDS.every(id => existingIds.includes(id));
+    return { configFile, trustFile: path.join(directory, 'client', 'trust.json'), reused: true, authMigrationRequired, topologyMigrationRequired };
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
   await mkdir(path.join(directory, 'server'), { recursive: true });
   await mkdir(path.join(directory, 'client'), { recursive: true });
   const runId = randomBytes(4).toString('hex');
-  const nodes = [['A', 18443], ['B', 28443], ['C', 38443]].map(([id, port]) => {
+  const nodes = [['A', 18443], ['B', 28443]].map(([id, port]) => {
     const hostname = `llm-${runId}-${id.toLowerCase()}.local`;
     return {
       id, port, label: defaultNodeLabel(id, { address, hostname }), hostname,
@@ -139,5 +162,5 @@ export async function initializeLab({ address, interfaceAddress, runtimeDir = '.
   await writeFile(path.join(directory, 'server', 'lab.json'), JSON.stringify(config, null, 2));
   const demoKeysFile = demoKeysPath(directory);
   await replaceIfChanged(demoKeysFile, demoKeysText(config, tokens), 0o600);
-  return { configFile, trustFile: path.join(directory, 'client', 'trust.json'), demoKeysFile, reused: false, authMigrationRequired: false };
+  return { configFile, trustFile: path.join(directory, 'client', 'trust.json'), demoKeysFile, reused: false, authMigrationRequired: false, topologyMigrationRequired: false };
 }

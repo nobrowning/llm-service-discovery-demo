@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import dnsPacket from 'dns-packet';
 import { createMockServer, DEMO_TOOL_NAME } from '../../packages/mock-api/index.mjs';
-import { initializeLab, migrateAuthDemo, DEMO_AUTH } from '../../packages/lab-controller/initialize.mjs';
+import { initializeLab, migrateAuthDemo, migrateThreeStateDemo, DEMO_AUTH } from '../../packages/lab-controller/initialize.mjs';
 
 const TOKENS = { 'a-text': 'test-token-a-text', 'a-vision': 'test-token-a-vision', 'b-tools': 'test-token-b-tools', 'c-basic': 'test-token-c-basic' };
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=';
@@ -224,9 +224,11 @@ test('new runtime stores presentation defaults and reused legacy runtime keeps t
   const options = { address: '192.0.2.10', interfaceAddress: '192.0.2.11', runtimeDir: directory };
   const created = await initializeLab(options);
   const lab = JSON.parse(await readFile(created.configFile, 'utf8'));
+  assert.equal(lab.nodes.length, 2);
+  assert.equal(created.topologyMigrationRequired, false);
   assert.equal(lab.nodes[0].label, 'Studio Workstation');
   assert.equal(lab.nodes[1].label, options.address, 'The IP example must use the reachable deployment address.');
-  assert.equal(lab.nodes[2].label, lab.nodes[2].hostname, 'The .local example must use the advertised TLS hostname.');
+  assert.ok(lab.nodes.every(node => node.hostname.endsWith('.local')), 'Each endpoint uses its advertised TLS .local hostname.');
   assert.equal(lab.nodes[0].services[1].label, 'Qwen2-5-VL-7B-Instruct');
   assert.equal(lab.nodes[0].services[1].display_name, 'Qwen2.5-VL-7B-Instruct');
   assert.equal(lab.nodes[0].services[1].deployment.quantization, 'BF16');
@@ -238,14 +240,14 @@ test('new runtime stores presentation defaults and reused legacy runtime keeps t
   delete lab.nodes[0].services[0].display_name;
   delete lab.nodes[0].services[0].deployment;
   for (const relative of ['lab.json', 'server/lab.json']) await writeFile(path.join(directory, relative), JSON.stringify(lab));
-  assert.deepEqual(lab.nodes.flatMap(node => node.services.map(service => service.auth)), ['none', 'required', 'required', 'none']);
-  assert.deepEqual(trusted.services.map(service => service.auth), ['none', 'required', 'required', 'none']);
+  assert.deepEqual(lab.nodes.flatMap(node => node.services.map(service => service.auth)), ['none', 'required', 'required']);
+  assert.deepEqual(trusted.services.map(service => service.auth), ['none', 'required', 'required']);
   assert.ok(trusted.services.every(service => !Object.hasOwn(service, 'tokenFile')));
   await assert.rejects(access(path.join(directory, 'client', 'tokens')), { code: 'ENOENT' });
   const keys = JSON.parse(await readFile(path.join(directory, 'server', 'tokens.json'), 'utf8'));
   const keyText = await readFile(created.demoKeysFile, 'utf8');
   assert.ok(keyText.includes('DEMO ONLY') && keyText.includes(keys['a-vision']) && keyText.includes(keys['b-tools']), 'The presenter file contains only the required synthetic keys.');
-  assert.ok(!keyText.includes(keys['a-text']) && !keyText.includes(keys['c-basic']), 'Unused keys must not be copied to the presenter file.');
+  assert.ok(!keyText.includes(keys['a-text']) && !Object.hasOwn(keys, 'c-basic'), 'Unused keys must not be copied to the presenter file and C is not initialized.');
   const files = ['lab.json', 'server/lab.json', 'server/server-key.pem', 'server/server.pem', 'server/tokens.json', 'client/trust.json', 'client/ca.pem', 'presenter/demo-api-keys.txt'];
   const hashFile = async relative => createHash('sha256').update(await readFile(path.join(directory, relative))).digest('hex');
   const before = await Promise.all(files.map(hashFile));
@@ -290,7 +292,7 @@ test('explicit auth migration is idempotent and preserves run identity, private 
   }
   assert.deepEqual(nextLab, lab, 'Only auth settings change in the lab manifest.');
   for (const [index, entry] of nextTrust.services.entries()) {
-    assert.equal(entry.auth, ['none', 'required', 'required', 'none'][index]);
+    assert.equal(entry.auth, ['none', 'required', 'required'][index]);
     assert.ok(!Object.hasOwn(entry, 'tokenFile'));
     const original = { ...trust.services[index] }; delete original.tokenFile;
     const current = { ...entry }; delete current.auth;
@@ -307,6 +309,44 @@ test('explicit auth migration is idempotent and preserves run identity, private 
   const rejectedBefore = await hashes(migratedFiles);
   await assert.rejects(migrateAuthDemo({ runtimeDir: directory }), /exact independent trust/);
   assert.deepEqual(await hashes(migratedFiles), rejectedBefore);
+});
+
+test('three-state migration retires only C and preserves all existing private material', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'llm-discovery-three-states-'));
+  t.after(async () => {
+    assert.equal(path.dirname(directory), path.resolve(tmpdir()));
+    assert.ok(path.basename(directory).startsWith('llm-discovery-three-states-'));
+    await rm(directory, { recursive: true, force: true });
+  });
+  const options = { address: '192.0.2.10', interfaceAddress: '192.0.2.11', runtimeDir: directory };
+  await initializeLab(options);
+  const lab = JSON.parse(await readFile(path.join(directory, 'lab.json'), 'utf8'));
+  const trust = JSON.parse(await readFile(path.join(directory, 'client/trust.json'), 'utf8'));
+  const cHost = `llm-${lab.runId}-c.local`;
+  lab.nodes.push({ id: 'C', port: 38443, label: cHost, hostname: cHost, services: [{ id: 'c-basic', label: 'Qwen3-8B', basePath: '/api/v1', model: 'mock-basic', auth: 'none' }] });
+  trust.services.push({ ...trust.services[0], baseURL: `https://${cHost}:38443/api/v1` });
+  const tokens = JSON.parse(await readFile(path.join(directory, 'server/tokens.json'), 'utf8'));
+  tokens['c-basic'] = 'synthetic-retired-c-key';
+  await writeFile(path.join(directory, 'server/tokens.json'), JSON.stringify(tokens));
+  for (const file of ['lab.json', 'server/lab.json']) await writeFile(path.join(directory, file), JSON.stringify(lab));
+  await writeFile(path.join(directory, 'client/trust.json'), JSON.stringify(trust));
+  const protectedFiles = ['server/server-key.pem', 'server/server.pem', 'server/ca.pem', 'server/tokens.json', 'client/ca.pem', 'client/marker.txt'];
+  const hashes = async files => Promise.all(files.map(async file => createHash('sha256').update(await readFile(path.join(directory, file))).digest('hex')));
+  const before = await hashes(protectedFiles);
+  assert.equal((await initializeLab(options)).topologyMigrationRequired, true, 'Startup only reports a migration requirement.');
+  const result = await migrateThreeStateDemo({ runtimeDir: directory });
+  assert.equal(result.changed, true);
+  assert.equal(result.credentialsPrinted, false);
+  assert.equal(result.savedKeySetupRequired, true, 'Topology migration never imports client credentials.');
+  assert.deepEqual(result.services.map(service => service.id), ['a-text', 'a-vision', 'b-tools']);
+  const nextLab = JSON.parse(await readFile(path.join(directory, 'lab.json'), 'utf8'));
+  const nextTrust = JSON.parse(await readFile(path.join(directory, 'client/trust.json'), 'utf8'));
+  assert.deepEqual(nextLab, { ...lab, nodes: lab.nodes.slice(0, 2) });
+  assert.deepEqual(nextTrust, { ...trust, services: trust.services.slice(0, 3) });
+  assert.deepEqual(await hashes(protectedFiles), before, 'Retired secrets are preserved and no identities rotate.');
+  assert.ok(!(await readFile(path.join(directory, 'presenter/demo-api-keys.txt'), 'utf8')).includes('c-basic'));
+  assert.equal((await migrateThreeStateDemo({ runtimeDir: directory })).changed, false);
+  assert.equal((await initializeLab(options)).topologyMigrationRequired, false);
 });
 
 test('client tools keep an internal HMAC integrity key even when API authentication is disabled', async (t) => {

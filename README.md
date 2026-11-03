@@ -4,7 +4,7 @@
 
 Discover local LLM APIs inside **DeepSeek Harness Desktop**, then connect from a normal conversation. An implementation experiment for [draft-cui-dawn-local-llm-api-discovery-00](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/).
 
-Three Docker containers publish their **own** mDNS/DNS-SD announcements. Node A serves independent text and vision APIs; B serves function calling; C serves basic text. All are clearly labelled mocks, with real HTTPS, bearer authentication, SSE, image-byte transfer and correlated tool results. No model weights, GPU or cloud key.
+Two Docker containers publish their **own** mDNS/DNS-SD announcements for three services. Node A serves independent text and vision APIs; B serves function calling. All are clearly labelled mocks, with real HTTPS, bearer authentication, SSE, image-byte transfer and correlated tool results. No model weights, GPU or cloud key.
 
 Cards use recognizable DeepSeek, Qwen and GLM model names with simulated deployment sizes, versions and precision settings. Only distinctive image/tool capabilities appear as badges. See [model presentation and source references](docs/model-presentation.md); these labels do not imply that the actual model weights are running.
 
@@ -22,11 +22,11 @@ npm test
 node scripts/verify-live.mjs
 ```
 
-Follow [Windows setup](docs/windows-quickstart.md), then [install the Harness plugin](docs/plugin-setup.md). This demo includes versioned component tarballs under `vendor/`, so `npm ci` works from this repository alone; sibling source checkouts are not required. Install `vendor/dsh-lan-discovery-0.3.1.tgz` with the CLI bundled with the installed Harness Desktop. These local artifacts have not been published to npm.
+Follow [Windows setup](docs/windows-quickstart.md), then [install the Harness plugin](docs/plugin-setup.md). This demo includes versioned component tarballs under `vendor/`, so `npm ci` works from this repository alone; sibling source checkouts are not required. Install `vendor/dsh-lan-discovery-0.4.0.tgz` with the CLI bundled with the installed Harness Desktop. These local artifacts have not been published to npm.
 
 Open **LAN services / 局域网服务**, inspect a service's capabilities, then connect and start a new conversation. The plugin supports English and Chinese through Harness's official locale service: the Harness preference takes priority, with system language as the fallback. Experiment trust is provisioned independently. Discovery alone never authorizes sending credentials.
 
-**Mixed authentication:** DeepSeek and Qwen3 connect without a key. Qwen-VL and GLM require the matching synthetic key from `.runtime/current/presenter/demo-api-keys.txt`; enter it in the service card and choose **Verify and connect**. A wrong key can be retried. Keys entered into the plugin stay in Host memory for this Harness run only. See the [API key demonstration](docs/api-key-demo.md) for migration, reset and test steps. No real provider credentials are needed.
+**Three authentication states:** DeepSeek needs no key; GLM uses a previously saved key; Qwen-VL waits for a key. Prepare the saved GLM state once using its synthetic key from `.runtime/current/presenter/demo-api-keys.txt`, with **Remember API key** selected, then leave Qwen-VL unconfigured. Saved keys survive Harness restarts; deselect Remember for session-only use. The plugin uses Harness's credential provider, whose current default stores a local, unencrypted YAML file. Keys are never returned to the page or advertised. See the [API key demonstration](docs/api-key-demo.md) for preparation, migration and reset. No real provider credentials are needed.
 
 The keyless Open Responses services are an explicit experimental extension: the current draft -00 binding requires `auth=required`. Authentication hints never replace local TLS trust.
 

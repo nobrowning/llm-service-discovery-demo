@@ -1,6 +1,6 @@
 # 协议映射、实验扩展与实现边界
 
-适用版本：本仓库 v0.3.0 演示实现；核对日期：2026-11-02。基础发现对照 [draft-cui-dawn-local-llm-api-discovery-00](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/)。该文档仍是 Internet-Draft；本项目不代表 IETF 已采纳或认证。
+适用版本：本仓库 v0.4.0 演示实现；核对日期：2026-11-03。基础发现对照 [draft-cui-dawn-local-llm-api-discovery-00](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/)。该文档仍是 Internet-Draft；本项目不代表 IETF 已采纳或认证。
 
 本文区分草案的线协议、本项目的部署选择以及已实现功能。设计目标、单元测试通过和真实 Desktop 验收是不同证据；请同时保留具体版本、测试输出与现场记录。
 
@@ -13,11 +13,10 @@
 | A | Node A Text，附带本次 run ID | `/text/v1` | `mock-text` |
 | A | Node A Vision，附带本次 run ID | `/vision/v1` | `mock-vision` |
 | B | Node B Tools，附带本次 run ID | `/v1` | `mock-tools` |
-| C | Node C Basic，附带本次 run ID | `/api/v1` | `mock-basic` |
 
 A 的两个入口拥有独立模型白名单、凭据和可用状态。它们可以共享主机与端口，但不能按 IP 去重。默认每个入口只暴露一个模型，避免把不同模型的能力并集误称为某个模型同时支持全部能力。
 
-当前 Windows 快速路线在已有 Ubuntu WSL 内运行独立 Docker daemon，三个容器使用该 daemon 的 host network。容器分别运行自己的 API 和公告器；三个逻辑节点共享 Ubuntu 的 IP，以端口和路径区分服务。这不是三个独立 LAN IP，也不证明 Docker Desktop 普通 bridge 能转发 mDNS。实际网络试验见 [network-spike.md](network-spike.md)，部署步骤见 [windows-quickstart.md](windows-quickstart.md)。
+当前 Windows 快速路线在已有 Ubuntu WSL 内运行独立 Docker daemon，两个容器使用该 daemon 的 host network。容器分别运行自己的 API 和公告器；两个逻辑节点共享 Ubuntu 的 IP，以端口和路径区分服务。这不是两个独立 LAN IP，也不证明 Docker Desktop 普通 bridge 能转发 mDNS。实际网络试验见 [network-spike.md](network-spike.md)，部署步骤见 [windows-quickstart.md](windows-quickstart.md)。
 
 ## 2. 基础发现线协议
 
@@ -84,18 +83,18 @@ Desktop 0.2.1-rc.3 的共享 registry 在调用精确路由前要求已建立 Pe
 
 控制请求按 JSON 对象读取，插件处理上限为 8 KiB；未知字段直接拒绝。检查/连接要求非空字符串候选 ID，连接另允许非空字符串模型 ID，单字段最长 1024 字符；开始、停止、断开只接受空对象。controller 再确认候选仍存在于当前发现结果，模型来自经认证取得的该服务目录。请求不能提供目标 URL、凭据文件、信任文件或 marker 路径；这些只来自本地插件配置和独立信任文件。共享载体使用 buffered body，因此 8 KiB 是插件处理门槛，不代表载体在读入任何数据前就执行相同门槛。
 
-控制边界与载体回归测试不替代实际 Desktop 会话验收。当前版本已通过正常会话的文本、图像、工具及断开恢复验证，结果见 [验证报告](validation-report.md)；后续修改或升级 Harness 后需要重新验收。
+控制边界与载体回归测试不替代实际 Desktop 会话验收。文本、图像、工具、断开恢复及凭据保存分别按版本记录，实际结果见 [验证报告](validation-report.md)；不能把历史四服务版本的通过结论当作新版验收。
 
 ## 4. 独立实验信任与凭据
 
-初始化脚本在本地生成实验 CA、服务证书和每服务 token。客户端 `trust.json` 分别限定准确 base URL、允许 IP、叶证书 SHA-256 与独立认证策略；同一个证书可以覆盖多个实验 hostname，但路径/端口对应的凭据仍分别管理。新版 Demo 不预填客户端 key，DeepSeek 与 Qwen3 免 key，Qwen-VL 与 GLM 需输入演示 key。详见 [API key 演示](api-key-demo.md)。
+初始化脚本在本地生成实验 CA、服务证书和每服务 token。客户端 `trust.json` 分别限定准确 base URL、允许 IP、叶证书 SHA-256 与独立认证策略；同一个证书可以覆盖多个实验 hostname，但路径/端口对应的凭据仍分别管理。0.4.0 默认为三个服务：DeepSeek 免 key、GLM 在演示准备时保存 key、Qwen-VL 尚未输入。已保存是客户端状态，DNS-SD 仍只发布 auth=required/none。详见 [API key 演示](api-key-demo.md)。
 
 | 检查 | 实现行为 |
 | --- | --- |
 | 候选是否经过独立授权 | 准确 URL 必须存在于本地信任文件，已发现地址必须与获准地址有交集 |
 | 对端身份 | 验证实验 CA 链、hostname 与叶证书指纹 |
 | DNS 地址与证书 hostname | 连接到经过允许范围检查的地址，保留原 hostname 验证 |
-| 密钥来源 | 用户在密码框输入，验证后仅保留在 Host 本次运行内；兼容可选的本地 tokenFile；广告不能指定凭据文件 |
+| 密钥来源 | 用户在密码框输入并验证，可通过 Harness 官方 credentials 服务记住或仅本次使用；兼容可选 tokenFile；广告不能指定凭据来源 |
 | 跳转 | 拒绝 HTTP redirect，不跨目的地转发 token |
 | 全局环境 | 不安装系统全局 CA，不设置 `NODE_TLS_REJECT_UNAUTHORIZED=0`，不复用云 API key |
 
@@ -113,7 +112,7 @@ TLS 认证的是 API 连接；它不为此前的 mDNS 报文提供签名。显�
 
 | 字段 | 含义与边界 |
 | --- | --- |
-| `mock` | 服务自报实现为模拟器；本部署四服务都为 Mock |
+| `mock` | 服务自报实现为模拟器；本部署三服务都为 Mock |
 | `demo_node_label` | 展示分组，不是设备身份或授权依据 |
 | `models[].id` | 对应请求中的 model；需与该服务 `/models` 列表交叉检查 |
 | `input_modalities` / `output_modalities` | 输入/输出维度；图片输入不等于图片生成 |
@@ -155,7 +154,7 @@ Open Responses 以 item、工具调用及语义事件描述交互；本项目只
 
 Mock 要求该附注不超过 512 字节、最多 64 个不重复且范围有效的整数索引，并且每个索引只能指向纯文本 user 消息。错误附注显式返回 `invalid_demo_context`。为兼容早期仅处理时钟的客户端，旧字段 `demo_time_context_indices` 可单独使用；新旧字段同时出现则拒绝。标注仅影响确定性文本回显、工具触发及“是否有新用户回合”的判定；所有输入仍正常校验，工具结果仍须通过原 `call_id` 关联和签名检查。附注不会提供文件路径、访问授权或工具权限，也不进入日志。这让真正的用户输入和工具结果不会被宿主上下文覆盖，同时保留完整请求内容。
 
-四个默认服务支持流式与非流式。C 的 `MOCK_NONSTREAM_ONLY=true` 场景会声明并强制 `stream=false`；当前 Harness adapter 需要 SSE，因此该服务可以被发现、直接非流式调用，却不能在这个 adapter 中接入。当前没有非流式客户端 fallback，也没有推理代理。
+三个默认服务支持流式与非流式。保留的独立 C 测试夹具（不在默认 Compose 中）的 `MOCK_NONSTREAM_ONLY=true` 场景会声明并强制 `stream=false`；当前 Harness adapter 需要 SSE，因此该服务可以被发现、直接非流式调用，却不能在这个 adapter 中接入。当前没有非流式客户端 fallback，也没有推理代理。
 
 未实现的 API 功能包括 stateful continuation、`previous_response_id`、持久化 responses、后台任务、JSON Schema 输出、音视频、任意服务端工具和远程图片抓取。完整合同见 [Mock README](../packages/mock-api/README.md)。
 
@@ -181,4 +180,4 @@ node node_modules/dsh-lan-discovery/verify.mjs
 
 草案 -00 §5.2 支持通用 `auth=none|required` 提示，但 §5.3 要求 Open Responses 绑定使用 `required`。本 Demo 有意将免 key 模式作为实验扩展；解析结果以 `draftAuthCompatible:false` 与 warning 标记，不宣称该模式符合此绑定。插件要求公告与本地信任策略一致，免 key 服务仍须通过同样的 TLS 校验。
 
-新增 owner-only `credential` 请求仅接受 candidateId 和 apiKey；验证成功后才存入进程内存。`forget-credential` 按 Host 已保存的身份清除，即使服务已经离线也能撤销旧 key 与路由。状态、journal 与错误不回传 key，退出或重载插件清空内存 key。请求体字段校验和 8 KiB 上限保留，错误正文不回显原始输入或上游 JSON。
+owner-only `credential` 请求接受 candidateId、apiKey 和可选布尔 remember；API 省略 remember 时默认为 false，具备保存支持的界面默认勾选。验证成功后才保留，选择记住时通过 Harness 官方 credentials 服务持久化。当前默认 provider 使用本地未加密 YAML，不是操作系统加密保险库；仅本次使用的 key 在退出或重载后清空。保存项绑定精确端点、证书指纹、获准地址和认证策略，不能按显示名跨身份复用。`forget-credential` 按插件拥有的身份清除会话/持久化项及路由，即使已离线也可撤销。状态、journal 与错误不回传 key；请求体字段校验和 8 KiB 上限保留，错误不回显输入或上游 JSON。

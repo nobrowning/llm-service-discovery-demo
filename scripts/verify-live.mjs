@@ -14,16 +14,15 @@ import { ResponsesAdapter, buildResponsesRequest } from 'dsh-lan-discovery/respo
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
-const options = { runtime: resolve(root, '.runtime/current'), output: resolve(root, 'artifacts/live-verification.json'), timeoutMs: 30000, cNonstream: false };
+const options = { runtime: resolve(root, '.runtime/current'), output: resolve(root, 'artifacts/live-verification.json'), timeoutMs: 30000 };
 for (let index = 0; index < args.length; index++) {
   const flag = args[index];
-  if (flag === '--expect-c-nonstream') options.cNonstream = true;
-  else if (['--runtime', '--output', '--timeout-ms'].includes(flag) && args[index + 1]) {
+  if (['--runtime', '--output', '--timeout-ms'].includes(flag) && args[index + 1]) {
     const value = args[++index];
     if (flag === '--runtime') options.runtime = resolve(value);
     else if (flag === '--output') options.output = resolve(value);
     else options.timeoutMs = Number(value);
-  } else throw new Error('Usage: node scripts/verify-live.mjs [--runtime DIR] [--output FILE] [--timeout-ms N] [--expect-c-nonstream]');
+  } else throw new Error('Usage: node scripts/verify-live.mjs [--runtime DIR] [--output FILE] [--timeout-ms N]');
 }
 if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1000 || options.timeoutMs > 120000) throw new Error('Discovery timeout must be 1000..120000 ms.');
 
@@ -32,9 +31,9 @@ const report = {
   schema: 'llm-discovery-demo-live-verification/v1',
   startedAt: new Date(started).toISOString(),
   status: 'failed',
-  scenario: options.cNonstream ? 'mixed-auth-c-nonstream-only' : 'mixed-auth-four-streaming-services',
+  scenario: 'three-services-one-free-two-authenticated',
   execution: { discovery: 'real-mdns-udp', transport: 'plugin-scoped-https-ca-hostname-fingerprint-address-pin', streaming: 'plugin-ResponsesAdapter', toolExecutor: 'standalone-verifier-client', credentials: 'explicit-server-test-keys-required-services-only', desktopSessionExecuted: false },
-  discovery: { expected: 4, found: 0, events: {}, services: [] },
+  discovery: { expected: 3, found: 0, events: {}, services: [] },
   checks: [],
 };
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -75,16 +74,16 @@ try {
   const testKeys = JSON.parse(await readFile(resolve(options.runtime, 'server/tokens.json'), 'utf8'));
   // These URLs are expectations only. Only discovery.snapshot() supplies candidates.
   const expected = lab.nodes.flatMap(node => node.services.map(service => ({ id: service.id, model: service.model, auth: service.auth, baseURL: canonicalBaseURL(`https://${node.hostname}:${node.port}${service.basePath}`) })));
-  assert.equal(expected.length, 4, 'The default experiment must define four services.');
-  assert.equal(new Set(expected.map(service => service.baseURL)).size, 4, 'Service endpoints must be distinct.');
-  assert.deepEqual(Object.fromEntries(expected.map(service => [service.id, service.auth])), { 'a-text': 'none', 'a-vision': 'required', 'b-tools': 'required', 'c-basic': 'none' }, 'Run the explicit mixed-auth migration before this acceptance test.');
+  assert.equal(expected.length, 3, 'The default experiment must define three services.');
+  assert.equal(new Set(expected.map(service => service.baseURL)).size, 3, 'Service endpoints must be distinct.');
+  assert.deepEqual(Object.fromEntries(expected.map(service => [service.id, service.auth])), { 'a-text': 'none', 'a-vision': 'required', 'b-tools': 'required' }, 'Run the explicit three-state migration before this acceptance test.');
   assert.ok(trust.services.every(service => !service.tokenFile), 'Mixed-auth trust must not prefill client token files.');
   report.runId = lab.runId;
   report.discovery.interfaceAddress = lab.interfaceAddress;
   discovery = createDiscoveryClient({ interfaceAddress: lab.interfaceAddress, networkId: `live-${lab.runId}`, queryIntervalMs: 2000 });
   unsubscribe = discovery.subscribe(event => { if (['added', 'updated', 'removed', 'invalid', 'warning', 'error'].includes(event.type)) report.discovery.events[event.type] = (report.discovery.events[event.type] ?? 0) + 1; });
   const found = new Map();
-  const discoveryPassed = await check('network', 'discover-four-services', async () => {
+  const discoveryPassed = await check('network', 'discover-three-services', async () => {
     await discovery.start();
     const deadline = Date.now() + options.timeoutMs;
     while (Date.now() < deadline) {
@@ -102,7 +101,7 @@ try {
       const candidate = found.get(service.id);
       return { id: service.id, baseURL: candidate.baseURL, addresses: candidate.addresses, apiProfile: candidate.apiProfile, protocolVersion: candidate.protocolVersion, auth: candidate.auth, valid: candidate.validation?.valid === true, recordGeneration: candidate.recordGeneration };
     });
-    assert.equal(found.size, expected.length, 'Four unique live mDNS services were not discovered before the deadline.');
+    assert.equal(found.size, expected.length, 'Three unique live mDNS services were not discovered before the deadline.');
     return { count: found.size, source: 'discovery.snapshot' };
   });
   if (discoveryPassed) for (const expectedService of expected) {
@@ -159,13 +158,7 @@ try {
       const base = { provider: adapter.binding.provider, model: selected.id };
       const prompt = `live-check-${randomUUID()}`;
       const messages = [user(prompt)];
-      const cNonstream = options.cNonstream && expectedService.id === 'c-basic';
-      await check(expectedService.id, cNonstream ? 'honest-nonstream-diagnostic' : 'text-stream', async () => {
-        if (cNonstream) {
-          assert.equal(selected.streaming, 'unsupported', 'C must declare no streaming for this scenario.');
-          await assert.rejects(collect(adapter.stream({ ...base, messages })), /requires a declared streaming/);
-          return { adapterConnectable: false, reason: 'streaming-required' };
-        }
+      await check(expectedService.id, 'text-stream', async () => {
         assert.equal(selected.streaming, 'supported', 'Default service must declare streaming.');
         const chunks = await collect(adapter.stream({ ...base, messages })); completed(chunks);
         assert.ok(streamText(chunks).includes(prompt), 'Text stream did not contain the transmitted text.');

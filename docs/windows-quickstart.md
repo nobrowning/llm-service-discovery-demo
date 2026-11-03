@@ -1,6 +1,6 @@
 # Windows 轻量模式快速部署
 
-本模式保留 Windows 原生 DeepSeek Harness。三个 Linux 容器在**已有 Ubuntu WSL** 的网络中运行，容器自己发布 mDNS/DNS-SD；Windows 插件负责发现和连接。三个节点共享 Ubuntu 的地址、使用不同端口，共提供四项 mock API 服务。无需模型、GPU、新建 VM 或 Windows 代公告器。
+本模式保留 Windows 原生 DeepSeek Harness。两个 Linux 容器在**已有 Ubuntu WSL** 的网络中运行，容器自己发布 mDNS/DNS-SD；Windows 插件负责发现和连接。两个节点共享 Ubuntu 的地址、使用不同端口，共提供三项 mock API 服务。无需模型、GPU、新建 VM 或 Windows 代公告器。
 
 实测可用的网络路径是独立运行在 Ubuntu 内的 Docker daemon。Docker Desktop 的 `host networking` 在本机只能打通普通 HTTP，未打通所需组播，因此这里不依赖该开关，也不自动修改它。
 
@@ -42,9 +42,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
    Docker CLI 与 Compose 使用项目自己的配置目录 `spikes/network/.runtime/docker-cli`。若需要初始化 Compose，会先校验官方固定版本的 SHA-256；不修改用户 Docker 配置或系统 CLI 链接。
 3. 优先使用隔离 daemon 中缓存的 `node:24-alpine`；其次加载 `spikes/network/.runtime/node-24-alpine.tar`。仅缺少缓存时，才从本机 Docker Desktop 导出基础镜像。
 4. 复用 `.runtime/current` 中的 token、证书和客户端信任；第一次使用空目录时才初始化。
-5. 执行 `scripts/prepare-offline-image.mjs`，在隔离 daemon 中以 `--pull=false` 构建 `llm-discovery-demo:0.3.0`。正式镜像无需经 Docker Desktop 构建或导出。
-6. 生成该 runtime 的 Compose 挂载 override，只挂载 `server` 目录；启动 `llm-discovery-demo` 项目的三个节点。
-7. 从 Windows 进行 10 秒真实 mDNS 发现，检查四项服务，并保存 `discovery-latest.json`。
+5. 执行 `scripts/prepare-offline-image.mjs`，在隔离 daemon 中以 `--pull=false` 构建 `llm-discovery-demo:0.4.0`。正式镜像无需经 Docker Desktop 构建或导出。
+6. 生成该 runtime 的 Compose 挂载 override，只挂载 `server` 目录；启动 `llm-discovery-demo` 项目的两个节点，并只清理该项目中退役的 node-c 容器。
+7. 从 Windows 进行 10 秒真实 mDNS 发现，检查三项服务，并保存 `discovery-latest.json`。
 
 已有镜像且源码未改时可用：
 
@@ -53,6 +53,19 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 ```
 
 `-SkipDiscoveryCheck` 仅用于诊断时跳过最后的发现检查。默认保留该检查；固定地址 HTTP 可达不能代替发现成功。
+
+## 旧四服务目录迁移
+
+先断开 LAN 并完全退出 Harness，再显式执行：
+
+```powershell
+node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime .runtime/current
+.\scripts\start-demo.ps1
+```
+
+保留原有私钥、证书、token、marker 和 runId，仅更新认证/拓扑并解除旧 tokenFile 引用；初始化不会隐式迁移。新版启动使用 `--remove-orphans`，只移除同一项目已经退役的 node-c。
+
+随后按 [API key 三状态演示](api-key-demo.md) 在 GLM 卡片保存一次 key，Vision 保持未配置，即可看到免 key、已保存和待输入三种状态。默认保存使用 Harness 的本地凭据 provider（当前是未加密 YAML）；可取消“记住 API key”而仅本次使用。
 
 ## Runtime、IP 变化与 Harness
 
@@ -69,7 +82,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 安装插件前完全退出 Harness，再使用当前安装版自带 CLI 安装本仓库的插件包。将以下应用路径替换为自己的 Harness 安装位置，在 Demo 根目录运行：
 
 ```powershell
-& 'C:\path\to\DeepseekHarness\resources\runtime\cli\bin\dsh.cmd' plugin --profile desktop add (Join-Path $PWD 'vendor/dsh-lan-discovery-0.3.1.tgz')
+& 'C:\path\to\DeepseekHarness\resources\runtime\cli\bin\dsh.cmd' plugin --profile desktop add (Join-Path $PWD 'vendor/dsh-lan-discovery-0.4.0.tgz')
 ```
 
 这会安装打包版本，日常运行不需要保留插件源码 checkout。配置、升级和断开恢复步骤见插件安装说明。独立插件默认关闭演示行为；本 Demo 需按说明显式设置 `demoMode: true`，启用固定 marker 工具和 Mock 上下文标注。插件界面优先跟随 Harness 语言偏好，没有偏好时按系统语言选择，支持中文与英语。
@@ -96,7 +109,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 - **Desktop 显示不可用，但隔离 daemon 已有基础镜像：**可继续离线启动；Desktop 不参与正式镜像构建。
 - **缺少基础镜像且 Desktop 无法导出：**在其他可信 Docker 环境导出 `node:24-alpine`，放到 `spikes/network/.runtime/node-24-alpine.tar` 后重试。
 - **找不到对应 vEthernet：**查看 `doctor` 输出，核对指定的是现有 Ubuntu 发行版及其实际接口。不要改用静态服务清单替代发现。
-- **容器启动后发现不足四项：**保留运行现场，查看 runtime 的发现快照和三个节点日志。脚本不会通过 Windows 代公告器绕过问题。
+- **容器启动后发现不足三项：**保留运行现场，查看 runtime 的发现快照和两个节点日志。脚本不会通过 Windows 代公告器绕过问题。
 - **首次镜像准备与重复启动的区别：**基础镜像、Node 依赖和官方 static archive 需要一次性缓存；`--pull=false` 的正式构建不要求访问 registry。
 
 网络 spike 的原始记录和实际验证边界见 `docs/network-spike.md`。
@@ -108,8 +121,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 ```powershell
 python -m venv spikes/network/.runtime/interop-venv
 & .\spikes\network\.runtime\interop-venv\Scripts\python.exe -m pip install zeroconf==0.153.0
-& .\spikes\network\.runtime\interop-venv\Scripts\python.exe spikes/network/interop-observer.py --interface <doctor输出的WindowsInterfaceAddress> --seconds 20 --expected 4 --output artifacts/interop.json
+& .\spikes\network\.runtime\interop-venv\Scripts\python.exe spikes/network/interop-observer.py --interface <doctor输出的WindowsInterfaceAddress> --seconds 20 --expected 3 --output artifacts/interop.json
 ```
+
+### 历史四服务版本的实测记录（2026-11-02）
+
+以下记录对应旧三容器、四服务版本，不作为 0.4.0 三服务或凭据持久化的验收。
 
 2026-11-02 已实测解析四项服务。`artifacts/interop.json` 保留标准 TXT 字段、端口与观察结果，移除实际 IP、hostname、本地路径和服务实例名；它证明 DNS-SD 的独立实现互通，不代替 TLS、授权、Harness 或生命周期验收。
 

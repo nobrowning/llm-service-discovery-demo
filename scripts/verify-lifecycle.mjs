@@ -1,4 +1,4 @@
-/** Windows/WSL lifecycle acceptance: container-owned mDNS 4 -> 3 -> 4.
+/** Windows/WSL lifecycle acceptance: container-owned mDNS 3 -> 2 -> 3.
  * The only mutation is SIGUSR2 to this lab's verified node-a container.
  */
 import assert from 'node:assert/strict';
@@ -77,7 +77,7 @@ try {
   report.runId = lab.runId;
   report.interfaceAddress = lab.interfaceAddress;
   expected = lab.nodes.flatMap(node => node.services.map(service => ({ id: service.id, baseURL: canonicalBaseURL(`https://${node.hostname}:${node.port}${service.basePath}`) })));
-  assert.deepEqual(expected.map(service => service.id).sort(), ['a-text', 'a-vision', 'b-tools', 'c-basic'], 'Unexpected experiment service set.');
+  assert.deepEqual(expected.map(service => service.id).sort(), ['a-text', 'a-vision', 'b-tools'], 'Unexpected experiment service set.');
   const trust = await loadTrust(resolve(options.runtime, 'client/trust.json'));
   const serverKeys = JSON.parse(await readFile(resolve(options.runtime, 'server/tokens.json'), 'utf8'));
   await check('verify-isolated-node-a-target', async () => {
@@ -100,7 +100,7 @@ try {
   });
   await discovery.start();
   let initial;
-  await check('initial-four-services', async () => { initial = await waitForSet(expected.map(service => service.id), 'initial'); return { count: initial.length }; });
+  await check('initial-three-services', async () => { initial = await waitForSet(expected.map(service => service.id), 'initial'); return { count: initial.length }; });
   textTransport = createPinnedTransport(authorizeCandidate(initial.find(row => row.id === 'a-text').candidate, trust), { timeoutMs: 10000 });
   visionTransport = createPinnedTransport(authorizeCandidate(initial.find(row => row.id === 'a-vision').candidate, trust), { timeoutMs: 10000, apiKey: serverKeys['a-vision'] });
   await check('text-initially-ready', async () => { assert.equal(await textIsReady(), true); });
@@ -108,11 +108,11 @@ try {
   await check('withdraw-text-only', async () => {
     signalMayHaveBeenSent = true;
     await toggleText();
-    await waitForSet(['a-vision', 'b-tools', 'c-basic'], 'text-withdrawn');
+    await waitForSet(['a-vision', 'b-tools'], 'text-withdrawn');
     assert.equal(await textIsReady(), false, 'Text HTTP readiness must match withdrawal.');
     assert.ok(report.events.slice(eventStart).some(event => event.service === 'a-text' && event.type === 'removed'), 'Missing actual mDNS removal event.');
     assert.ok(!report.events.slice(eventStart).some(event => event.service !== 'a-text' && event.type === 'removed'), 'Another service disappeared during Text withdrawal.');
-    return { count: 3, textHttpStatus: 503, sharedHostnameStillUsable: true };
+    return { count: 2, textHttpStatus: 503, sharedHostnameStillUsable: true };
   });
   await check('vision-https-while-text-offline', async () => {
     const catalog = await visionTransport.json('models');
@@ -128,11 +128,11 @@ try {
     assert.equal(await textIsReady(), false, 'Text must remain offline during the Vision request.');
     return { model: models[0].id, outputSha256: createHash('sha256').update(output).digest('hex'), textRemainedOffline: true };
   });
-  await check('restore-four-services', async () => {
+  await check('restore-three-services', async () => {
     await toggleText();
     await waitForSet(expected.map(service => service.id), 'text-restored');
     assert.equal(await textIsReady(), true, 'Text did not become ready after restoration.');
-    return { count: 4, textReady: true };
+    return { count: 3, textReady: true };
   });
 } catch (error) {
   if (!report.checks.some(item => item.status === 'failed')) report.checks.push({ name: 'setup-or-runtime', status: 'failed', category: category(error) });
@@ -144,7 +144,7 @@ try {
         if (!await textIsReady()) { await toggleText(); await waitForSet(expected.map(service => service.id), 'finally-restored'); }
         assert.equal(await textIsReady(), true);
         await waitForSet(expected.map(service => service.id), 'finally-confirmed', false);
-        return { ready: true, discovered: 4 };
+        return { ready: true, discovered: 3 };
       });
     } catch { /* Preserve failed restoration explicitly in the report and exit nonzero. */ }
   }

@@ -1,7 +1,7 @@
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { initializeLab, migrateAuthDemo } from './initialize.mjs';
+import { initializeLab, migrateAuthDemo, migrateThreeStateDemo } from './initialize.mjs';
 import { createDiscoveryClient } from '@llm-discovery/discovery-core';
 
 const [command, ...args] = process.argv.slice(2);
@@ -11,6 +11,8 @@ if (command === 'init') {
   console.log(JSON.stringify(await initializeLab({ address: option('address'), interfaceAddress: option('interface'), runtimeDir }), null, 2));
 } else if (command === 'migrate-auth-demo') {
   console.log(JSON.stringify(await migrateAuthDemo({ runtimeDir }), null, 2));
+} else if (command === 'migrate-three-state-demo') {
+  console.log(JSON.stringify(await migrateThreeStateDemo({ runtimeDir }), null, 2));
 } else if (command === 'doctor') {
   console.log(JSON.stringify({ node: process.version, platform: process.platform, interfaces: Object.entries(os.networkInterfaces()).flatMap(([name, rows]) => rows.filter((r) => !r.internal && r.family === 'IPv4').map((r) => ({ name, address: r.address }))) }, null, 2));
 } else if (command === 'browse') {
@@ -28,6 +30,6 @@ if (command === 'init') {
   await client.stop();
   if (!result.length) process.exitCode = 2;
 } else {
-  console.log('Usage: npm run lab -- init --address <service-ip> --interface <windows-interface-ip> [--runtime path]\n       npm run lab -- migrate-auth-demo [--runtime path]\n       npm run lab -- doctor\n       npm run lab -- browse [--interface ip] [--seconds 30] [--output path]');
+  console.log('Usage: npm run lab -- init --address <service-ip> --interface <windows-interface-ip> [--runtime path]\n       npm run lab -- migrate-auth-demo [--runtime path]\n       npm run lab -- migrate-three-state-demo [--runtime path]\n       npm run lab -- doctor\n       npm run lab -- browse [--interface ip] [--seconds 30] [--output path]');
   if (command) process.exitCode = 1;
 }

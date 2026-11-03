@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $report = & (Join-Path $PSScriptRoot 'doctor.ps1') -Distro $Distro -RuntimeDir $RuntimeDir -DockerContext $DockerContext -AsObject
 if (-not $report.ReadyToStart) { throw ($report.Problems -join "`n") }
-$image = 'llm-discovery-demo:0.3.0'
+$image = 'llm-discovery-demo:0.4.0'
 $socket = 'unix:///var/tmp/llm-discovery-docker-0/docker.sock'
 $helper = $report.RepositoryWslPath + '/spikes/network/wsl-engine.sh'
 $composeFile = $report.RepositoryWslPath + '/deploy/compose.yaml'
@@ -37,7 +37,7 @@ $plan = [PSCustomObject][ordered]@{
     HarnessChanged = $false
 }
 if ($DryRun -or $WhatIfPreference) { $plan | ConvertTo-Json -Depth 4; return }
-if (-not $PSCmdlet.ShouldProcess('llm-discovery-demo in the isolated Ubuntu Docker daemon', 'Build/load image and start three mock nodes')) { return }
+if (-not $PSCmdlet.ShouldProcess('llm-discovery-demo in the isolated Ubuntu Docker daemon', 'Build/load image and start two mock nodes with three services')) { return }
 
 function Invoke-Checked {
     param([string]$Executable, [string[]]$Arguments)
@@ -105,6 +105,11 @@ try {
     }
     # initializeLab reuses matching runtime state and rejects address changes.
     Invoke-Checked 'node.exe' @('packages/lab-controller/cli.mjs', 'init', '--address', $report.ServiceAddress, '--interface', $report.WindowsInterfaceAddress, '--runtime', $report.RuntimePath)
+    $lab = Get-Content -LiteralPath (Join-Path $report.RuntimePath 'lab.json') -Raw | ConvertFrom-Json
+    $serviceIds = @($lab.nodes | ForEach-Object { $_.services } | ForEach-Object { $_.id } | Sort-Object)
+    if (($serviceIds -join ',') -ne 'a-text,a-vision,b-tools') {
+        throw 'This runtime needs the explicit three-service migration. Exit Harness, run node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime <runtime-directory>, then restart the Demo.'
+    }
     if (-not $SkipBuild) {
         Invoke-Checked 'node.exe' @('scripts/prepare-offline-image.mjs')
         Invoke-Checked 'wsl.exe' @('-d', $Distro, '-u', 'root', '--exec', 'env', 'DOCKER_BUILDKIT=0', 'sh', $helper, 'docker', 'build', '--pull=false', '-t', $image, ($report.RepositoryWslPath + '/.runtime/container-build'))
@@ -112,14 +117,15 @@ try {
 
     # Compose merges mounts by target, replacing /lab with this runtime's server-only path.
     $services = [ordered]@{}
-    foreach ($service in @('node-a', 'node-b', 'node-c')) {
+    foreach ($service in @('node-a', 'node-b')) {
         $services[$service] = @{ volumes = @(@{ type = 'bind'; source = ($report.RuntimeWslPath + '/server'); target = '/lab'; read_only = $true }) }
     }
     $override = @{ services = $services } | ConvertTo-Json -Depth 8
     [IO.File]::WriteAllText($overrideFile, $override + "`n", [Text.UTF8Encoding]::new($false))
     $composeArguments = @('compose', '--project-name', 'llm-discovery-demo', '-f', $composeFile, '-f', $overrideWsl)
     Invoke-IsolatedDocker ($composeArguments + @('config', '--quiet'))
-    Invoke-IsolatedDocker ($composeArguments + @('up', '-d', '--no-build'))
+    # Remove only retired services belonging to this explicit Compose project.
+    Invoke-IsolatedDocker ($composeArguments + @('up', '-d', '--no-build', '--remove-orphans'))
     Invoke-IsolatedDocker ($composeArguments + @('ps'))
     if (-not $SkipDiscoveryCheck) {
         $snapshot = Join-Path $report.RuntimePath 'discovery-latest.json'

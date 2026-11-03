@@ -1,18 +1,18 @@
 # 局域网 LLM API 服务发现 Demo 实施计划
 
-- 版本：v0.4，独立组件与双语插件版，2026-11-02。
+- 版本：v0.4.0，三种凭据状态与保存版，2026-11-03。
 - 基线：[draft-cui-dawn-local-llm-api-discovery-00](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/)。
-- 客户端：现有 DeepSeek Harness Desktop 0.2.1-rc.3。
+- 客户端：现有 DeepSeek Harness Desktop 0.2.1-rc.3 / 0.2.1-rc.5。
 - 用户确定的约束：**只有容器发布公告；Windows 只运行发现客户端。**
 - 实际完成状态见 [验证报告](docs/validation-report.md)，不将计划项预先算作已验证。
 
 ## 1. 目标与范围
 
-单台 Windows 电脑模拟三个节点、四个独立 LLM API。用户在 Harness 的“局域网服务”中发现候选、检查能力、点击连接并新建正常会话。入口来自真实网络发现。
+单台 Windows 电脑模拟两个节点、三个独立 LLM API。用户在 Harness 的“局域网服务”中发现候选、检查能力、点击连接并新建正常会话。入口来自真实网络发现。
 
 所有模型均为 Mock，不需要 GPU、模型权重、云密钥或额度。发现、TLS、认证、HTTP/SSE、图像字节和工具结果回传必须真实发生。发现对象是 **LLM API 服务接口**，不是 Agent；服务端不规划任务、不执行客户端工具。
 
-首版仅快速部署，不建立额外 VM、Hyper-V/VirtualBox 网络、三个独立 LAN IP 或 Office/Home 多网络实验。
+首版仅快速部署，不建立额外 VM、Hyper-V/VirtualBox 网络、多个独立 LAN IP 或 Office/Home 多网络实验。
 
 ## 2. 实测可行的拓扑
 
@@ -29,25 +29,19 @@ flowchart LR
       BA[公告器 B]
       BT[Tools API]
     end
-    subgraph C[容器 C]
-      CA[公告器 C]
-      CT[Basic API]
-    end
   end
   AA <-->|mDNS / DNS-SD| H
   BA <-->|mDNS / DNS-SD| H
-  CA <-->|mDNS / DNS-SD| H
   H -->|直接 HTTPS| AT
   H --> AV
   H --> BT
-  H --> CT
 ```
 
 本机 Docker Desktop host networking 能打通 TCP，但没有打通所需 Windows↔容器 mDNS。因此使用已有 Ubuntu WSL，在其中启动专用临时 Docker Engine，Compose 容器使用 Linux host network。
 
 - 不增加 VM，不修改 WSL 网络模式，不设置 Windows 代公告器、reflector 或推理网关。
 - 专用 daemon、socket、数据目录，与用户其他 Docker 工作负载分离。
-- 三个容器拥有独立文件系统和进程，**共享一个 WSL IP**，按端口和路径区分服务。这不是三个独立 LAN IP。
+- 两个容器拥有独立文件系统和进程，**共享一个 WSL IP**，按端口和路径区分服务。这不是多个独立 LAN IP。
 - 每个容器内部同时运行 API 与自己的公告器。
 - Windows socket 绑定 ANY，并显式选择 WSL 虚拟网卡加入和发送组播。
 - 自动读取 WSL 和 Windows 接口地址，不在公开配置中写死本机 IP。
@@ -62,13 +56,12 @@ flowchart LR
 | A | Text | 18443 | /text/v1 | mock-text | 文本输入/输出、SSE |
 | A | Vision | 18443 | /vision/v1 | mock-vision | 文本/图像输入、文本输出、SSE |
 | B | Tools | 28443 | /v1 | mock-tools | 文本、函数调用、工具结果回传、SSE |
-| C | Basic | 38443 | /api/v1 | mock-basic | 基础文本、SSE |
 
 每服务有独立 DNS-SD 实例、模型白名单、路径与认证策略，需要 key 的服务分别校验。A 的两项服务共享端口但可单独上下线，不能按 IP 合并服务。
 
-展示层使用真实公开型号及模拟部署规格：A 为 DeepSeek-R1-Distill-Qwen-32B（Q4_K_M）与 Qwen2.5-VL-7B-Instruct（BF16），B 为 GLM-4-9B-Chat（INT4），C 为 Qwen3-8B（Q8_0）。上述表格中的 `mock-*` 保留为请求 ID；卡片和 Harness 模型菜单使用展示名。能力标签只突出图像、工具调用，文本和 SSE 不作为常规标签。字段、来源及 Mock 边界见 [模型展示说明](docs/model-presentation.md)。
+展示层使用真实公开型号及模拟部署规格：A 为 DeepSeek-R1-Distill-Qwen-32B（Q4_K_M）与 Qwen2.5-VL-7B-Instruct（BF16），B 为 GLM-4-9B-Chat（INT4）。上述表格中的 `mock-*` 保留为请求 ID；卡片和 Harness 模型菜单使用展示名。能力标签只突出图像、工具调用，文本和 SSE 不作为常规标签。字段、来源及 Mock 边界见 [模型展示说明](docs/model-presentation.md)。
 
-默认服务同时支持流式及非流式响应。C 可设为 nonstream-only，展示“发现成功、当前流式适配器不能接入”的兼容性区别。
+默认三个服务同时支持流式及非流式响应。C 仅保留为独立 nonstream-only 测试夹具，不在默认 Compose 中，用来覆盖“发现成功、当前流式适配器不能接入”的兼容性区别。
 
 - 图像 Mock 返回真实接收的字节数和 SHA-256，不声称理解图像。
 - 函数调用由 API 生成，固定只读工具由 Harness 客户端执行，结果回传后才完成。
@@ -101,7 +94,7 @@ flowchart LR
 | dsh-lan-discovery | 独立 Harness 插件：双语原生侧栏、能力过滤、信任验证、配置事务、Responses 适配 |
 | LLM_service_discovery（本仓库） | Demo 的 mock-api、lab-controller、Compose、网络与演示脚本、集成验证和文档 |
 
-四个仓库采用 MIT 许可证，源码托管于 GitHub 的 `nobrowning` 账号下。可复用组件的维护源码从 Demo 分离；Demo 的 `packages/` 只保留 `mock-api` 和 `lab-controller`。发现核心库与公告器为 0.3.0，Harness 插件为 0.3.1，通过 `vendor/*.tgz` 和 lockfile 固定，单独取得 Demo 仓库即可 `npm ci`，不依赖兄弟目录或尚未发布的 npm 包。仓库关系、打包与更新步骤见 [独立仓库说明](docs/repositories.md)。
+四个仓库采用 MIT 许可证，源码托管于 GitHub 的 `nobrowning` 账号下。可复用组件的维护源码从 Demo 分离；Demo 的 `packages/` 只保留 `mock-api` 和 `lab-controller`。发现核心库与公告器为 0.3.0，Harness 插件为 0.4.0，通过 `vendor/*.tgz` 和 lockfile 固定，单独取得 Demo 仓库即可 `npm ci`，不依赖兄弟目录或尚未发布的 npm 包。仓库关系、打包与更新步骤见 [独立仓库说明](docs/repositories.md)。
 
 使用 JavaScript ESM，Node >=24 为当前完整复现基线。服务镜像仅包含所需服务代码与安装后的运行依赖，不含 Harness 或客户端 marker。
 
@@ -110,7 +103,7 @@ flowchart LR
 - GET {base}/models
 - GET {base}/_demo/capabilities
 - POST {base}/responses
-- TLS 是统一要求；DeepSeek/Qwen3 免 key，Qwen-VL/GLM 要求独立 Bearer key。key 不在 DNS 中传播，免 key Open Responses 是草案绑定之外的实验扩展。
+- TLS 是统一要求；DeepSeek 免 key，Qwen-VL/GLM 要求独立 Bearer key。GLM 通过演示准备保存一次 key，Qwen-VL 初始未配置。key 不在 DNS 中传播，免 key Open Responses 是草案绑定之外的实验扩展。
 - 图像上限 5 MiB，请求体上限 8 MiB；不抓取外部图像 URL。
 - 工具结果必须对应原 function_call 的 call_id；缺失/错误不能通过。
 - 不实现真实推理、搜索、任意工具或服务器推理状态保存。
@@ -162,7 +155,7 @@ node scripts/verify-live.mjs
 .\scripts\stop-demo.ps1
 ```
 
-插件使用 Desktop 自带 CLI 安装 `vendor/dsh-lan-discovery-0.3.1.tgz`，不用其他 npm 版 dsh 改桌面 profile。日常部署不需要插件源码仓库；修改插件时在独立 `dsh-lan-discovery` 仓库构建、验证并更新安装包。具体命令和配置见 [插件安装说明](docs/plugin-setup.md)。
+插件使用 Desktop 自带 CLI 安装 `vendor/dsh-lan-discovery-0.4.0.tgz`，不用其他 npm 版 dsh 改桌面 profile。日常部署不需要插件源码仓库；修改插件时在独立 `dsh-lan-discovery` 仓库构建、验证并更新安装包。具体命令和配置见 [插件安装说明](docs/plugin-setup.md)。
 
 A Text 单独上下线使用容器 SIGUSR2，避开 Node 保留的 SIGUSR1。API readiness 驱动对应实例撤销和恢复，Vision 仍运行。
 
@@ -171,7 +164,7 @@ A Text 单独上下线使用容器 SIGUSR2，避开 Node 保留的 SIGUSR1。API
 | 阶段 | 交付 | 门槛 |
 |---|---|---|
 | P0 网络 | 真实 Windows↔容器组播 | 读到 PTR/SRV/TXT/A 并按发现入口请求 |
-| P1 服务 | 三节点四服务、TLS/能力 | 文本、图像、工具请求与回应 |
+| P1 服务 | 两节点三服务、TLS/能力 | 文本、图像、工具请求与回应 |
 | P2 插件 | 原生侧栏、配置适配 | 实际 Harness 新会话接入和恢复 |
 | P3 动态行为 | 单服务上下线、缓存失效 | A Text 撤销不影响 Vision；错误记录测试 |
 | P4 展示与复现 | 脚本、独立 observer、文档 | 当前机器重复部署；第二台机器独立复现 |
@@ -186,11 +179,21 @@ A Text 单独上下线使用容器 SIGUSR2，避开 Node 保留的 SIGUSR1。API
 - Docker Desktop 本机组播路径失败，已改用已有 WSL 链路；其他机器需重新 doctor 与发现测试。
 - WSL 重启可能改变 IP；地址不匹配时拒绝静默覆盖旧信任，创建新 runtime 后更新插件配置。
 - Windows 防火墙提示由用户手动处理，脚本不修改规则。
-- Desktop 兼容基线固定为 0.2.1-rc.3，升级需重新验证。
+- Desktop 当前支持 0.2.1-rc.3 / 0.2.1-rc.5，升级需重新验证。
 - 未完成通用能力自动刷新、完整 RFC 一致性、IPv6 实机验证、跨子网发现。
 - 本轮不建立多 VM、多 LAN IP、完整场景平台或通用真实模型兼容层。
 - MIT 已选定；npm 或镜像发行前仍需完成第二台干净机器复现、发行包复核及版本发布。源码以四个独立 GitHub 仓库提供，并附复现文档。
 
-## API key 增量（0.3.0）
+## 10. 凭据保存与三种演示状态（0.4.0）
 
-在发现之后，免 key 服务直接连接；需 key 服务在卡片密码框输入，验证元数据成功后连接。错误输入可重试。key 只保留在 Host 本次运行内，可更换、清除；退出后不保留。Demo 演示者从本地 presenter/demo-api-keys.txt 取得随机 fixture，插件不读取此文件。迁移与演示详见 [API key 演示说明](docs/api-key-demo.md)。
+初始布局：DeepSeek 无需 key；GLM 已保存 key；Qwen-VL 尚未填写 key。先用 GLM 自己的本地合成 key 在卡片验证并保存，再断开，Vision 保持未配置。展示已保存状态不把 key 填回密码框，也不自动连接。
+
+输入 key 默认选择“记住 API key”；通过模型和能力接口验证后，插件使用 Harness 官方 credentials 服务保存。当前默认 provider 写入本地未加密 YAML，不是系统加密保险库，文档明确说明；取消勾选则仅本次运行使用。凭据按精确端点、证书、允许地址和认证策略绑定，不按服务名或 IP 共享。
+
+普通断开保留已保存 key，退出后可恢复；清除会删除插件拥有的该服务凭据并撤销连接。错误替换不覆盖原先已验证 key。状态、恢复 journal、错误和发现公告不返回 key；保存失败必须显式反馈，不能显示为已保存。
+
+Demo 演示者从本地 presenter/demo-api-keys.txt 取得随机 fixture，插件不自行读取此文件。旧四服务目录显式执行 migrate-three-state-demo，保留身份与私有材料，再重建两容器拓扑。迁移与演示详见 [API key 演示说明](docs/api-key-demo.md)。
+
+### 历史版本
+
+0.3.0/0.3.1 使用三节点四服务、两免 key 两需 key，用户输入只保留于单次 Harness 运行。该版本的测试和桌面记录作为历史证据保留，不能作为 0.4.0 的持久化与三服务验收。

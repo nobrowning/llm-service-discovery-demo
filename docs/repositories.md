@@ -7,7 +7,7 @@
 | llm-discovery-core | [源码](https://github.com/nobrowning/llm-discovery-core) | 发现协议、记录校验、缓存和客户端生命周期；不依赖 Harness 或 Demo |
 | llm-api-advertiser | [源码](https://github.com/nobrowning/llm-api-advertiser) | 可嵌入的公告库与 `llm-api-advertise` CLI，给已有 API 发布公告 |
 | dsh-lan-discovery | [源码](https://github.com/nobrowning/dsh-lan-discovery) | 原生 Harness 页面、中文/英语、信任检查及 Responses 适配 |
-| llm-service-discovery-demo | [源码](https://github.com/nobrowning/llm-service-discovery-demo) | Mock API、三容器编排、IETF 演示与跨组件验收 |
+| llm-service-discovery-demo | [源码](https://github.com/nobrowning/llm-service-discovery-demo) | Mock API、两容器三服务编排、IETF 演示与跨组件验收 |
 
 每个仓库都可以独立克隆到任意目录。运行代码不依赖其他仓库的本机路径。
 
@@ -22,7 +22,7 @@ flowchart TD
 
 ## 可独立安装的版本快照
 
-发现核心库和公告器当前为 `0.3.0`，Harness 插件为 `0.3.1`，尚未发布到 npm registry。为让每个仓库单独克隆即可安装，公告器和插件仓库携带 `vendor/llm-discovery-discovery-core-0.3.0.tgz`，并在自己的 npm 安装包中 bundle core 及所需依赖。Demo 携带三个组件的 tgz，`package-lock.json` 固定文件和传递依赖。第三方依赖仍保留原始许可证。
+Demo 当前为 `0.4.0`。发现核心库和公告器当前为 `0.3.0`，Harness 插件为 `0.4.0`，尚未发布到 npm registry。为让每个仓库单独克隆即可安装，公告器和插件仓库携带 `vendor/llm-discovery-discovery-core-0.3.0.tgz`，并在自己的 npm 安装包中 bundle core 及所需依赖。Demo 携带三个组件的 tgz，`package-lock.json` 固定文件和传递依赖。第三方依赖仍保留原始许可证。
 
 因此无需 npm scope 权限、父目录 workspace、兄弟目录链接、Git submodule 或在线临时拉取未发布的 core；正常执行 `npm ci --ignore-scripts` 即可。首次安装外部依赖仍需要 npm registry 或本地缓存。
 
