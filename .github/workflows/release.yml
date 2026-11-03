@@ -57,6 +57,7 @@ jobs:
             .release/*.zip
             .release/SHA256SUMS
           if-no-files-found: error
+          include-hidden-files: true
       - name: Create draft for final download acceptance
         env:
           GH_TOKEN: ${{ github.token }}
