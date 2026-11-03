@@ -1,0 +1,14 @@
+node_modules/
+.runtime/
+spikes/network/evidence/
+.reference/
+**/.reference/
+*.tgz
+!vendor/*.tgz
+*.log
+artifacts/*
+!artifacts/.gitkeep
+.env
+*.key
+*-key.pem
+coverage/

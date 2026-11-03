@@ -1,0 +1,26 @@
+{
+  "components": [
+    {
+      "repository": "llm-discovery-core",
+      "name": "@llm-discovery/discovery-core",
+      "file": "llm-discovery-discovery-core-0.3.0.tgz",
+      "sha256": "ab67d35bbbde87b582c662558bc718b1c63184a2a924b201768c6699534c6877",
+      "version": "0.3.0"
+    },
+    {
+      "repository": "llm-api-advertiser",
+      "name": "@llm-discovery/advertiser",
+      "file": "llm-discovery-advertiser-0.3.0.tgz",
+      "sha256": "5ab09f0d37708207b53194105f90993b4f7b72feffe92777724a3289c4391f3f",
+      "version": "0.3.0"
+    },
+    {
+      "repository": "dsh-lan-discovery",
+      "name": "dsh-lan-discovery",
+      "file": "dsh-lan-discovery-0.3.1.tgz",
+      "sha256": "fcd0570368e7817a8163333150d2059c366eb2342d695146c69c306101b64108",
+      "version": "0.3.1"
+    }
+  ],
+  "schema": "llm-discovery-component-manifest/v1"
+}

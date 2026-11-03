@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:llm-discovery-demo:capabilities:v1",
+  "title": "Experimental LLM discovery demo capabilities v1",
+  "description": "Application-layer extension, not part of draft-cui-dawn-local-llm-api-discovery-00. Missing capability fields mean unknown. Values are service claims, not verification results.",
+  "type": "object",
+  "required": ["schema", "revision", "cache_max_age_seconds", "mock", "models"],
+  "properties": {
+    "schema": {"const": "llm-discovery-demo-capabilities/v1"},
+    "revision": {"type": "string", "minLength": 1, "maxLength": 64},
+    "cache_max_age_seconds": {"type": "integer", "minimum": 0, "maximum": 3600},
+    "mock": {"type": "boolean"},
+    "demo_node_label": {"type": "string", "maxLength": 128},
+    "service_label": {"type": "string", "maxLength": 128},
+    "models": {
+      "type": "array", "maxItems": 128,
+      "items": {
+        "type": "object", "required": ["id"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "display_name": {"type": "string", "minLength": 1, "maxLength": 256},
+          "deployment": {
+            "description": "Simulated deployment presentation for the demo; quantization includes precision such as BF16 and does not claim an official quantized artifact.",
+            "type": "object", "required": ["parameters", "quantization", "version"],
+            "properties": {
+              "parameters": {"type": "string", "minLength": 1, "maxLength": 64},
+              "quantization": {"type": "string", "minLength": 1, "maxLength": 64},
+              "version": {"type": "string", "minLength": 1, "maxLength": 64}
+            },
+            "additionalProperties": false
+          },
+          "input_modalities": {"$ref": "#/$defs/modalities"},
+          "output_modalities": {"$ref": "#/$defs/modalities"},
+          "streaming": {"$ref": "#/$defs/support"},
+          "function_calling": {"$ref": "#/$defs/support"},
+          "structured_output": {"$ref": "#/$defs/support"},
+          "server_tools": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64}}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "support": {"enum": ["supported", "unsupported", "unknown"]},
+    "modalities": {"type": "array", "uniqueItems": true, "maxItems": 16, "items": {"type": "string", "minLength": 1, "maxLength": 32}}
+  }
+}

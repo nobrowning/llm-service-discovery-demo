@@ -1,0 +1,41 @@
+# 发布准备
+
+项目采用 MIT 许可证，拆分为发现核心库、服务端公告器、Harness 插件和 Demo 四个独立源码仓库。源码仓库链接见 [仓库与依赖](repositories.md)；尚未发布 npm 或镜像 registry。
+
+Demo 通过 `vendor/*.tgz` 使用发现核心库 / 公告器 0.3.0 和 Harness 插件 0.3.1 安装包，并用 lockfile 固定依赖；只取得 Demo 仓库即可执行 `npm ci`，无需其他仓库位于相邻目录。插件安装与配置见 [plugin-setup.md](plugin-setup.md)，组件维护和更新方式见 [repositories.md](repositories.md)。
+
+## 已准备
+
+- 中英文 README、实现计划、协议映射、演示脚本与 Windows 快速启动。
+- 两免 key、两需 key 的混合认证演示；密码输入、错误重试、内存生命周期与独立 TLS 信任。
+- 已选定 MIT；各仓库保留许可证和版权声明。
+- 可复用源码的独立仓库边界，以及 Demo 使用版本化组件包的部署方式。
+- 插件使用 Harness 官方 locale 服务支持中文与英语，优先跟随 Harness 偏好，否则跟随系统语言。
+- npm lockfile、三容器 Compose、隔离 daemon 脚本、只包含服务代码的离线构建。
+- 协议/API/插件边界自动测试，以及真实网络/独立 observer 验证脚本。
+- 忽略 .runtime、node_modules、.reference、密钥、token 和机器上的证据文件；`vendor/` 中经过审查的组件 tarball 是有意纳入版本控制的部署依赖。
+- 插件使用 npm files 白名单；本地参考解包、用户 profile 不在发行文件内。
+- 原有本机真实 Harness 桌面验收覆盖四服务发现、能力筛选、Text/Basic 文本、图片字节传输、原生工具往返、冷启动恢复和断开恢复默认模型。此次国际化与拆分后的实际验收另行记录，不能直接沿用旧验收结论；详见验证报告。
+
+## 发布前完成
+
+1. 在第二台干净机器按文档复现；确认已有 x86-64 WSL、官方工具缓存与初次 Node 基础镜像准备前提。
+2. 对每个待发布版本执行独立安装、测试、`npm pack` 内容审查和 Demo 集成验证；记录实际 Harness 的中英文切换及打包插件接入结果。不可用开发 checkout 测试代替 tarball 安装测试。
+3. 后续版本发布前确认远程分支、标签与发行包对应。四个公开源码仓库统一位于 `nobrowning` 账号，链接见仓库说明。
+4. 若转向 npm registry 分发，先确认 package scope/名称可用，再按核心库、公告器/插件、Demo 的依赖顺序发布并更新 lockfile；本地 tarball 不表示已经发布 npm。
+5. 固定正式发行镜像摘要与 Docker/Node 支持版本，做实际断公网演示。
+6. 审查拟提交文件和 tarball，不包含个人路径、运行证书、token、用户对话、原应用解包或私有参考源码。共享验证证据前按用途脱敏。
+7. 运行各仓库 CI 与发布校验；基础命令为 `npm ci --ignore-scripts` 和 `npm test`，组件包还需通过各自构建与打包检查。
+8. 明确草案版本与实验能力扩展；避免完整 RFC 一致性或真实模型能力的宣称。
+
+## 第三方依赖
+
+| 依赖 | 当前版本 | 声明许可证 | 用途 |
+|---|---|---|---|
+| multicast-dns | 7.2.5 | MIT | mDNS socket 与报文 |
+| dns-packet | 5.6.1 | MIT | DNS 编解码 |
+| thunky | 1.1.0 | MIT | multicast-dns 依赖 |
+| @leichtgewicht/ip-codec | 2.0.5 | MIT | 地址编码 |
+| node-forge | 1.4.2 | BSD-3-Clause OR GPL-2.0 | 本地实验证书生成 |
+
+版本以 package-lock.json 为准；再分发时保留所选许可证和原版权声明。Docker static binaries、Node/Alpine 镜像、DeepSeek Harness 与独立 Python zeroconf 工具各有自己的许可证；不能将项目许可证代替它们。

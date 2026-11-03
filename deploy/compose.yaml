@@ -1,0 +1,28 @@
+name: llm-discovery-demo
+x-node: &node
+  image: llm-discovery-demo:0.3.0
+  pull_policy: never
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  network_mode: host
+  init: true
+  stop_grace_period: 10s
+  volumes:
+    - ../.runtime/current/server:/lab:ro
+  read_only: true
+  tmpfs:
+    - /tmp
+services:
+  node-a:
+    <<: *node
+    environment:
+      MOCK_NODE: A
+  node-b:
+    <<: *node
+    environment:
+      MOCK_NODE: B
+  node-c:
+    <<: *node
+    environment:
+      MOCK_NODE: C

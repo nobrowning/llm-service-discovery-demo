@@ -1,0 +1,9 @@
+# Use the locally loaded, verified node:24-alpine base. No RUN or network access.
+# The bootstrap records the pulled base digest in its evidence and lock report.
+FROM node:24-alpine
+WORKDIR /app
+COPY packages ./packages
+COPY node_modules ./node_modules
+COPY source-manifest.json ./source-manifest.json
+USER node
+ENTRYPOINT ["node", "packages/lab-controller/node-runner.mjs"]

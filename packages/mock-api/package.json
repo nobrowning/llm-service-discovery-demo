@@ -1,0 +1,11 @@
+{
+  "name": "@llm-discovery-demo/mock-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./index.mjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
