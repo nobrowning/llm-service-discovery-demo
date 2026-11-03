@@ -12,3 +12,7 @@ artifacts/*
 *.key
 *-key.pem
 coverage/
+
+.release/
+.release-input/
+.release-extracted/

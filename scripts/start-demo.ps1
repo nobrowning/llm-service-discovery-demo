@@ -11,7 +11,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $report = & (Join-Path $PSScriptRoot 'doctor.ps1') -Distro $Distro -RuntimeDir $RuntimeDir -DockerContext $DockerContext -AsObject
 if (-not $report.ReadyToStart) { throw ($report.Problems -join "`n") }
-$image = 'llm-discovery-demo:0.4.0'
+$image = 'llm-discovery-demo:0.5.1'
+$releaseImage = $report.ReleaseImage
+$useReleaseImage = $null -ne $releaseImage
 $socket = 'unix:///var/tmp/llm-discovery-docker-0/docker.sock'
 $helper = $report.RepositoryWslPath + '/spikes/network/wsl-engine.sh'
 $composeFile = $report.RepositoryWslPath + '/deploy/compose.yaml'
@@ -24,10 +26,11 @@ $plan = [PSCustomObject][ordered]@{
     WindowsInterfaceAddress = $report.WindowsInterfaceAddress
     Runtime = $report.RuntimePath
     RuntimeAction = $(if ($report.RuntimeExists) { 'Reuse existing tokens and trust' } else { 'Initialize new runtime once' })
-    BuildEngine = 'isolated WSL daemon, offline curated context'
-    BaseImageSource = $(if ($report.BaseImageCached) { 'isolated daemon cache' } elseif ($report.BaseArchiveAvailable) { 'local base tar' } else { 'check retained daemon cache, then local Docker bootstrap' })
+    BuildEngine = $(if ($useReleaseImage) { 'verified release archive, isolated WSL daemon' } else { 'isolated WSL daemon, offline curated context' })
+    BaseImageSource = $(if ($useReleaseImage) { 'not required for the prebuilt release image' } elseif ($report.BaseImageCached) { 'isolated daemon cache' } elseif ($report.BaseArchiveAvailable) { 'local base tar' } else { 'check retained daemon cache, then local Docker bootstrap' })
     Image = $image
-    RebuildImage = -not $SkipBuild
+    ReleaseImage = $releaseImage
+    RebuildImage = -not ($SkipBuild -or $useReleaseImage)
     Project = 'llm-discovery-demo'
     DaemonSocket = $socket
     ComposeFile = $composeFile
@@ -93,7 +96,18 @@ try {
         Invoke-IsolatedDocker @('compose', 'version', '--short')
     }
     $isolatedPrefix = @('-d', $Distro, '-u', 'root', '--exec', 'sh', $helper, 'docker')
-    if (-not $SkipBuild -and -not (Read-ImageId 'wsl.exe' $isolatedPrefix 'node:24-alpine')) {
+    if ($useReleaseImage) {
+        # Recheck immediately before loading; doctor has already checked the path,
+        # manifest schema/version, expected tag, and archive completeness.
+        if ((Get-FileHash -LiteralPath $releaseImage.Path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $releaseImage.Sha256) {
+            throw 'Release image SHA-256 changed after the preflight check. The archive was not loaded.'
+        }
+        Invoke-IsolatedDocker @('image', 'load', '-i', ($report.RepositoryWslPath + '/' + $releaseImage.File))
+        $loadedImageId = Read-ImageId 'wsl.exe' $isolatedPrefix $image
+        if (-not $loadedImageId -or ($releaseImage.Id -and $loadedImageId -cne $releaseImage.Id)) {
+            throw 'The loaded image does not match the release manifest. Containers were not started.'
+        }
+    } elseif (-not $SkipBuild -and -not (Read-ImageId 'wsl.exe' $isolatedPrefix 'node:24-alpine')) {
         $baseArchive = Join-Path $downloadDirectory 'node-24-alpine.tar'
         if (-not (Test-Path -LiteralPath $baseArchive)) {
             if (-not $report.BuildEngineVersion) { throw 'The isolated daemon has no cached node:24-alpine image. Provide spikes/network/.runtime/node-24-alpine.tar or start the existing local Docker Desktop engine; no system settings were changed.' }
@@ -110,7 +124,7 @@ try {
     if (($serviceIds -join ',') -ne 'a-text,a-vision,b-tools') {
         throw 'This runtime needs the explicit three-service migration. Exit Harness, run node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime <runtime-directory>, then restart the Demo.'
     }
-    if (-not $SkipBuild) {
+    if (-not $useReleaseImage -and -not $SkipBuild) {
         Invoke-Checked 'node.exe' @('scripts/prepare-offline-image.mjs')
         Invoke-Checked 'wsl.exe' @('-d', $Distro, '-u', 'root', '--exec', 'env', 'DOCKER_BUILDKIT=0', 'sh', $helper, 'docker', 'build', '--pull=false', '-t', $image, ($report.RepositoryWslPath + '/.runtime/container-build'))
     } else { Invoke-IsolatedDocker @('image', 'inspect', $image, '--format', '{{.Id}}') }
@@ -130,10 +144,13 @@ try {
     if (-not $SkipDiscoveryCheck) {
         $snapshot = Join-Path $report.RuntimePath 'discovery-latest.json'
         Invoke-Checked 'node.exe' @('packages/lab-controller/cli.mjs', 'browse', '--runtime', $report.RuntimePath, '--interface', $report.WindowsInterfaceAddress, '--seconds', '10', '--output', $snapshot)
-        $found = @(Get-Content -LiteralPath $snapshot -Raw | ConvertFrom-Json)
+        # Windows PowerShell 5.1 emits a JSON array as one pipeline object.
+        # Assign first so @() counts its elements, not the outer pipeline item.
+        $found = Get-Content -LiteralPath $snapshot -Raw | ConvertFrom-Json
+        $foundCount = if ($null -eq $found) { 0 } else { @($found).Count }
         $lab = Get-Content -LiteralPath (Join-Path $report.RuntimePath 'lab.json') -Raw | ConvertFrom-Json
         $expected = @($lab.nodes | ForEach-Object { $_.services }).Count
-        if ($found.Count -ne $expected) { throw "Containers started, but discovery found $($found.Count) of $expected services. Inspect the runtime snapshot and node logs; the containers remain available for diagnosis." }
+        if ($foundCount -ne $expected) { throw "Containers started, but discovery found $foundCount of $expected services. Inspect the runtime snapshot and node logs; the containers remain available for diagnosis." }
     }
     Write-Host "Demo ready. Runtime: $($report.RuntimePath)"
     Write-Host "Harness trust file: $(Join-Path $report.RuntimePath 'client/trust.json')"

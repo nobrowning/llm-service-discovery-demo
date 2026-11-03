@@ -4,21 +4,21 @@
       "repository": "llm-discovery-core",
       "name": "@llm-discovery/discovery-core",
       "file": "llm-discovery-discovery-core-0.3.0.tgz",
-      "sha256": "ab67d35bbbde87b582c662558bc718b1c63184a2a924b201768c6699534c6877",
+      "sha256": "7b7cbd798ebc92922c47acceda4a42c993b03870494c533c89ce3532e5f2f151",
       "version": "0.3.0"
     },
     {
       "repository": "llm-api-advertiser",
       "name": "@llm-discovery/advertiser",
       "file": "llm-discovery-advertiser-0.3.0.tgz",
-      "sha256": "5ab09f0d37708207b53194105f90993b4f7b72feffe92777724a3289c4391f3f",
+      "sha256": "21e1885509edcfedefe0d59b7d697901c7692c95f25206b962da52e954047e00",
       "version": "0.3.0"
     },
     {
       "repository": "dsh-lan-discovery",
       "name": "dsh-lan-discovery",
       "file": "dsh-lan-discovery-0.5.0.tgz",
-      "sha256": "688c07a7c5481f9534b42ed228b0d17085d7c07f48d573814f25573f295c895e",
+      "sha256": "9329e0600338dd6d1f7f550b883d774a7fcfea00779e616071f532e4590b518e",
       "version": "0.5.0"
     }
   ],

@@ -1,0 +1,70 @@
+name: Build release download
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to package
+        required: true
+        type: string
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Check tag
+        run: node --input-type=module -e "import fs from 'node:fs'; if(process.env.RELEASE_TAG !== 'v'+JSON.parse(fs.readFileSync('package.json')).version) throw Error('Tag/version mismatch')"
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: node scripts/verify-components.mjs
+      - name: Build and export server image
+        run: |
+          set -o pipefail
+          version=$(node -p "require('./package.json').version")
+          docker build -f deploy/Dockerfile -t "llm-discovery-demo:$version" .
+          mkdir -p .release-input
+          docker save "llm-discovery-demo:$version" | gzip -n > .release-input/image.tar.gz
+          docker image inspect "llm-discovery-demo:$version" --format '{{.Id}}' > .release-input/image-id.txt
+      - name: Package deployment ZIP
+        shell: pwsh
+        run: ./scripts/package-release.ps1 -ImageArchive .release-input/image.tar.gz -ImageId (Get-Content .release-input/image-id.txt) -OutputDirectory .release
+      - name: Check extracted dependencies and package digests
+        run: |
+          mkdir .release-extracted
+          unzip -q .release/*.zip -d .release-extracted
+          cd .release-extracted
+          sha256sum -c SHA256SUMS > /dev/null
+          node scripts/verify-components.mjs
+          npm test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo-release-download
+          path: |
+            .release/*.zip
+            .release/SHA256SUMS
+          if-no-files-found: error
+      - name: Create draft for final download acceptance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$RELEASE_TAG"
+          if gh release view "$tag" --json isDraft --jq .isDraft > .release/existing-draft.txt 2>/dev/null; then
+            test "$(cat .release/existing-draft.txt)" = true || { echo 'Refusing to overwrite a published release'; exit 1; }
+          else
+            gh release create "$tag" --verify-tag --draft --title "LLM service discovery Demo $tag" --notes-file docs/release-notes.md
+          fi
+          gh release upload "$tag" .release/*.zip .release/SHA256SUMS --clobber

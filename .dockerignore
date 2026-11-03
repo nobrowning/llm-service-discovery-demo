@@ -6,3 +6,6 @@ artifacts
 **/node_modules
 spikes
 *.log
+.release
+.release-input
+.release-extracted

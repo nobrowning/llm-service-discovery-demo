@@ -10,7 +10,19 @@ The compact service list uses recognizable DeepSeek, Qwen and GLM names with sim
 
 The verified Windows topology runs a dedicated Docker daemon in an **existing Ubuntu WSL** distribution. Containers share its host network/IP, distinguished by port and base path. Windows runs only the native discovery client. Docker Desktop host-mode multicast did not work on the tested machine; no Windows advertiser or static discovery list is substituted.
 
-## Quick start
+## Download a ready-to-run deployment
+
+Open [GitHub Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/latest) and download **llm-service-discovery-demo-0.5.1-windows-x64-wsl.zip** under Assets. It includes installed JavaScript dependencies, the Harness plugin, and a prebuilt Linux/amd64 server image. The automatic **Source code** archives do not contain these deployment extras.
+
+Extract the ZIP to a permanent local folder. With Windows x64, Node.js 24+ and an existing x86-64 Ubuntu WSL distribution available, run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
+```
+
+The launcher verifies and imports the bundled image; no local image build or Docker Desktop is needed. First-time Docker static/Compose downloads still require internet access. Install the bundled plugin and configure its trust/interface settings using [plugin setup](docs/plugin-setup.md). See [release notes](docs/release-notes.md) and [Windows setup](docs/windows-quickstart.md) for checksums, prerequisites and limitations.
+
+## Quick start from source
 
 Prerequisites: Windows, Node.js 24+, and an existing x86-64 Ubuntu WSL distribution. The startup script caches the official Docker static tools and, when needed, a checksum-pinned Compose plugin; runtime commands do not depend on Docker Desktop's WSL CLI symlinks. The initial Node base image must be cached or exported from an existing local Docker engine. Desktop plugin compatibility: **0.2.1-rc.3 and 0.2.1-rc.5**.
 

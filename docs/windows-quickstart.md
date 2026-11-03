@@ -9,11 +9,25 @@
 - Windows 上安装 Node.js 24 或更新版本，以满足完整 Harness 插件运行要求。
 - 已有 x86-64 Ubuntu WSL 发行版；当前脚本默认名称为 `Ubuntu`，可用 `-Distro` 指定已有发行版。
 - 专用 daemon 使用项目缓存的 Docker static CLI，不依赖 `/usr/bin/docker` 或 Docker Desktop 的 WSL integration 挂载。缺少可用 Compose 时，启动脚本从 Docker 官方 GitHub 下载固定版本 `2.32.4`，核对 SHA-256 后只安装到项目忽略目录。
-- 首次准备依赖、官方 Docker static archive、Compose 插件和 Node 基础镜像需要网络，或预先缓存这些文件。Node 基础镜像需要已有本地 Docker 引擎导出，或预先提供归档。后续正式镜像使用本地源码和已安装的纯 JavaScript 依赖离线构建。
+- 首次准备缺少的 npm 依赖、官方 Docker static archive 和 Compose 插件需要网络，或预先缓存这些文件。Release 部署包携带预构建镜像，无需准备 Node 基础镜像或本地构建；源码包需要已有本地 Docker 引擎导出 Node 基础镜像，或预先提供归档。
 
 脚本不安装 WSL、不改变 WSL 网络模式、不修改防火墙、不重启 Docker Desktop，也不修改或重启 Harness。
 
 ## 检查和启动
+
+从 GitHub Release 下载的**部署 ZIP**解压后，根目录包含 `release-manifest.json`，镜像位于 `images/`。保留完整目录结构，在解压目录的 PowerShell 中运行：
+
+```powershell
+.\scripts\doctor.ps1
+.\scripts\start-demo.ps1 -DryRun
+.\scripts\start-demo.ps1
+```
+
+启动器自动核对清单版本、镜像路径与 SHA-256，然后把压缩镜像加载进项目专用 Docker daemon，跳过基础镜像准备及源码构建，无需 Docker Desktop。缺少依赖时仍会执行 `npm ci --ignore-scripts`；缺少官方 Docker static 或 Compose 时仍需联网下载。因此部署包不等于完整离线安装包，也不包含 Windows Node.js、Ubuntu WSL 或 Harness。运行 `doctor` 前请先安装 Node.js 24+ 并准备已有 x86-64 Ubuntu WSL。
+
+已识别的清单格式有误、镜像缺失或校验失败时会停止，不会自动回退为源码构建。`-DryRun` 与 `-WhatIf` 也会校验镜像，但不会加载镜像或启动容器。部署包始终按清单加载镜像，传入 `-SkipBuild` 不会跳过该校验。
+
+**GitHub 自动提供的 Source code ZIP 或 Git clone**不包含预构建镜像，继续使用源码路线：
 
 在仓库根目录的 PowerShell 中运行：
 
@@ -33,20 +47,20 @@ npm test
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 ```
 
-`doctor` 只读检查现有 Ubuntu 的 `eth0` 地址，按网段匹配 Windows 对应的 `vEthernet` 地址，检查 Node、Compose、基础镜像和 runtime 完整性。`ComposeBootstrapRequired: true` 表示实际启动时需下载或启用项目缓存的插件；只读检查与 `-DryRun` 不下载。输出不会读取或打印 token 内容。它可能唤醒已经安装的 Ubuntu，但不会创建发行版。
+`doctor` 只读检查现有 Ubuntu 的架构与 `eth0` 地址，按网段匹配 Windows 对应的 `vEthernet` 地址，检查 Node、Compose、发行镜像或基础镜像，以及 runtime 完整性。`ReleaseBundlePresent: true` 和有效的 `ReleaseImage` 表示识别到部署包。`ComposeBootstrapRequired: true` 表示实际启动时需下载或启用项目缓存的插件；只读检查与 `-DryRun` 不下载。输出不会读取或打印 token 内容。它可能唤醒已经安装的 Ubuntu，但不会创建发行版。
 
 `-DryRun` 和 `-WhatIf` 输出执行计划，不构建镜像、不生成凭证、不启动或停止容器。默认启动过程依次完成：
 
 1. 缺少项目依赖时执行 `npm ci --ignore-scripts`。
 2. 启动独立 daemon：`/var/tmp/llm-discovery-docker-0`。该 daemon 使用专用 socket、数据和日志目录，禁止 bridge、iptables/ip6tables、IP forwarding 和 masquerade 修改。
    Docker CLI 与 Compose 使用项目自己的配置目录 `spikes/network/.runtime/docker-cli`。若需要初始化 Compose，会先校验官方固定版本的 SHA-256；不修改用户 Docker 配置或系统 CLI 链接。
-3. 优先使用隔离 daemon 中缓存的 `node:24-alpine`；其次加载 `spikes/network/.runtime/node-24-alpine.tar`。仅缺少缓存时，才从本机 Docker Desktop 导出基础镜像。
+3. 部署包校验并加载清单指定的 `images/llm-discovery-demo-0.5.1.tar.gz`。源码路线优先使用隔离 daemon 中缓存的 `node:24-alpine`；其次加载 `spikes/network/.runtime/node-24-alpine.tar`。仅缺少缓存时，才从本机 Docker Desktop 导出基础镜像。
 4. 复用 `.runtime/current` 中的 token、证书和客户端信任；第一次使用空目录时才初始化。
-5. 执行 `scripts/prepare-offline-image.mjs`，在隔离 daemon 中以 `--pull=false` 构建 `llm-discovery-demo:0.4.0`。正式镜像无需经 Docker Desktop 构建或导出。
+5. 部署包核对加载后的 `llm-discovery-demo:0.5.1` 镜像，不执行构建。源码路线执行 `scripts/prepare-offline-image.mjs`，在隔离 daemon 中以 `--pull=false` 构建同名镜像。
 6. 生成该 runtime 的 Compose 挂载 override，只挂载 `server` 目录；启动 `llm-discovery-demo` 项目的两个节点，并只清理该项目中退役的 node-c 容器。
 7. 从 Windows 进行 10 秒真实 mDNS 发现，检查三项服务，并保存 `discovery-latest.json`。
 
-已有镜像且源码未改时可用：
+源码路线已有镜像且源码未改时可用：
 
 ```powershell
 .\scripts\start-demo.ps1 -SkipBuild
@@ -106,6 +120,7 @@ node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime .runtime
 
 ## 排查
 
+- **Release 镜像丢失或 SHA-256 不匹配：**重新下载并完整解压部署 ZIP，保留 `release-manifest.json` 与 `images/` 目录。不要删除清单来绕过校验；需要自行构建时另取源码包。
 - **Desktop 显示不可用，但隔离 daemon 已有基础镜像：**可继续离线启动；Desktop 不参与正式镜像构建。
 - **缺少基础镜像且 Desktop 无法导出：**在其他可信 Docker 环境导出 `node:24-alpine`，放到 `spikes/network/.runtime/node-24-alpine.tar` 后重试。
 - **找不到对应 vEthernet：**查看 `doctor` 输出，核对指定的是现有 Ubuntu 发行版及其实际接口。不要改用静态服务清单替代发现。

@@ -6,6 +6,8 @@ Demo 通过 `vendor/*.tgz` 使用发现核心库 / 公告器 0.3.0 和 Harness �
 
 ## 已准备
 
+- GitHub Release 分发流程：组件提供 tgz 与 SHA256SUMS；Demo 提供带 JavaScript 依赖、预构建镜像和文件校验值的 Windows/WSL ZIP。tag workflow 先生成草稿，下载验收后发布。
+- Demo 0.5.1 启动器校验发行镜像 SHA-256、tag 与 image ID，再载入专用 daemon；部署 ZIP 不需本地构建和 Node 基础镜像，首次工具下载仍需网络。
 - 中英文 README、实现计划、协议映射、演示脚本与 Windows 快速启动。
 - 免 key / 已保存 key / 待输入 key 的三服务演示；密码输入、错误重试、Harness 凭据持久化与可选仅本次使用，独立 TLS 信任。当前默认凭据 provider 是本地未加密 YAML，文档说明此限制。
 - 先浏览、再展开单项的服务选择流程；密码框及管理操作按需显示，收起或切换会清除未提交密码。主列表仅显示通用服务与凭据状态，模拟性质放在明确声明的服务详情中，普通服务无需“非 Mock”标签。
@@ -20,11 +22,11 @@ Demo 通过 `vendor/*.tgz` 使用发现核心库 / 公告器 0.3.0 和 Harness �
 
 ## 发布前完成
 
-1. 在第二台干净机器按文档复现；确认已有 x86-64 WSL、官方工具缓存与初次 Node 基础镜像准备前提。
+1. 扩展验证：在第二台干净机器按文档复现。已有 x86-64 WSL、Windows Node 24+ 是部署前提；Release ZIP 不需准备 Node 基础镜像。不能用本机新目录验证替代第二台机器验收。
 2. 对每个待发布版本执行独立安装、测试、`npm pack` 内容审查和 Demo 集成验证；记录实际 Harness 的中英文切换及打包插件接入结果。不可用开发 checkout 测试代替 tarball 安装测试。
 3. 后续版本发布前确认远程分支、标签与发行包对应。四个公开源码仓库统一位于 `nobrowning` 账号，链接见仓库说明。
 4. 若转向 npm registry 分发，先确认 package scope/名称可用，再按核心库、公告器/插件、Demo 的依赖顺序发布并更新 lockfile；本地 tarball 不表示已经发布 npm。
-5. 固定正式发行镜像摘要与 Docker/Node 支持版本，做实际断公网演示。
+5. Release manifest 固定镜像 ID、归档 SHA-256 与支持版本；后续补做实际断公网演示。首次工具下载尚需联网，当前不宣称完整离线安装。
 6. 审查拟提交文件和 tarball，不包含个人路径、运行证书、token、用户对话、原应用解包或私有参考源码。共享验证证据前按用途脱敏。
 7. 运行各仓库 CI 与发布校验；基础命令为 `npm ci --ignore-scripts` 和 `npm test`，组件包还需通过各自构建与打包检查。
 8. 明确草案版本与实验能力扩展；避免完整 RFC 一致性或真实模型能力的宣称。

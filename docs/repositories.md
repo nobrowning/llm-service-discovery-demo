@@ -22,7 +22,9 @@ flowchart TD
 
 ## 可独立安装的版本快照
 
-Demo 当前为 `0.5.0`。发现核心库和公告器当前为 `0.3.0`，Harness 插件为 `0.5.0`，尚未发布到 npm registry。为让每个仓库单独克隆即可安装，公告器和插件仓库携带 `vendor/llm-discovery-discovery-core-0.3.0.tgz`，并在自己的 npm 安装包中 bundle core 及所需依赖。Demo 携带三个组件的 tgz，`package-lock.json` 固定文件和传递依赖。第三方依赖仍保留原始许可证。
+Demo 当前为 `0.5.1`。发现核心库和公告器当前为 `0.3.0`，Harness 插件为 `0.5.0`，尚未发布到 npm registry。为让每个仓库单独克隆即可安装，公告器和插件仓库携带 `vendor/llm-discovery-discovery-core-0.3.0.tgz`，并在自己的 npm 安装包中 bundle core 及所需依赖。Demo 携带三个组件的 tgz，`package-lock.json` 固定文件和传递依赖。第三方依赖仍保留原始许可证。
+
+四仓各自的 Releases 提供下载附件；普通体验者优先使用 Demo 的 Windows/WSL 部署 ZIP，已带运行依赖和预构建服务镜像。只使用已有服务的 Harness 用户下载插件 tgz，服务提供者下载公告器 tgz，开发者使用核心库 tgz。发行包不带本机证书、API key 或用户 profile；每次首次部署在本机生成实验信任材料。
 
 因此无需 npm scope 权限、父目录 workspace、兄弟目录链接、Git submodule 或在线临时拉取未发布的 core；正常执行 `npm ci --ignore-scripts` 即可。首次安装外部依赖仍需要 npm registry 或本地缓存。
 

@@ -1,6 +1,18 @@
 # 验证报告
 
-更新日期：2026-11-03。当前 0.5.0 使用点击展开的服务列表，保留两个容器、三个服务及免 key、已保存 key、待输入 key 三种状态。各版本的实测范围分别记录如下，历史结果不替代当前版本验收。
+更新日期：2026-11-03。当前 Demo 0.5.1 随附插件 0.5.0，使用点击展开的服务列表，保留两个容器、三个服务及免 key、已保存 key、待输入 key 三种状态。各版本的实测范围分别记录如下，历史结果不替代当前版本验收。
+
+## 0.5.1 Release 部署验证
+
+Demo 0.5.1 增加 Windows/WSL 部署 ZIP，内含运行依赖、插件及预构建镜像。镜像清单绑定包版本、镜像 tag、Docker image ID 和归档 SHA-256；启动前拒绝缺包、路径越界、链接及损坏归档，部署路线不构建镜像、不要求 Docker Desktop 或 Node 基础镜像。首次缺少 Docker static/Compose 时仍需联网下载。
+
+发行准备包解压到新的本机目录后，257 个文件校验值、组件包校验和 **42/42** Demo 测试通过。使用 Windows PowerShell 5.1 启动，实际加载发行镜像并生成新 runtime；三个服务由容器公告，真实网络检查 **24/24**、生命周期 **7/7**（3→2→3）通过。随后恢复原 Demo runtime，原信任文件与 key 保留。准备期间发现 PS5.1 把管道中的 JSON 数组包装为单一对象导致计数误报，已修复，并纳入回归。
+
+Windows PowerShell 5.1 与 PowerShell 7 的启动器回归均 **30/30**，覆盖实际 JSON 数组计数、损坏镜像、路径/版本/tag 错误、加载后 image ID 不符及源码路线。测试位于 `tests/deployment/release-launcher.test.ps1`，不操作真实服务；Windows CI 会执行。
+
+四仓的 Release workflow 构建并测试后生成草稿，下载最终 GitHub 附件、校验并进行安装/启动验收后才发布。组件最终附件以 Linux CI 产物为准：Windows 打包与 Linux 打包可能仅有 tar 可执行权限差异，不能直接把压缩包哈希差异判定为源码差异。发行包不携带本机 runtime、证书、API key 或 Harness profile。
+
+此轮是同一台 Windows 机器上的独立解压目录与真实网络验证；未宣称第二台机器、全新 WSL 安装、完全离线安装或新的原生 Harness 图像/工具 UI 验收。插件 0.5.0 的已完成原生 UI 范围见下一节；最终 Release 下载验收结果记录于对应 GitHub Release 说明。
 
 ## 0.5.0 服务列表交互验收
 
@@ -123,7 +135,7 @@ node scripts/verify-lifecycle.mjs
 
 独立 observer 命令见 windows-quickstart.md。实时报告保存在已忽略的 artifacts/ 中；部分报告含实验 IP/随机 hostname，公开前再次按用途脱敏。token、私钥、用户云凭据和 marker 正文不进入报告。
 
-## 本机运行状态
+## 早期本机运行状态（历史）
 
 服务端保持三容器、四项服务运行。Harness 插件已安装并停留在发现页面；临时模型连接已断开，原默认模型已恢复。trustFile 和接口地址指向本次实验配置；安装前的相关配置备份位于 .runtime/current/client/install-backup/。
 

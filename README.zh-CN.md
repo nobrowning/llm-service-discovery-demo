@@ -13,7 +13,19 @@ API 均为 Mock，无需模型、GPU 或云额度。网络发现、HTTPS/认证�
 
 紧凑的服务列表只显示图像、工具调用等已知特殊能力；型号、版本及量化 / 精度的展示约定见 [模型展示说明](docs/model-presentation.md)。模拟服务在展开详情中说明其性质，列表不再用统一的 Mock / 非 Mock 标签；普通部署使用同一套界面。
 
-## 启动
+## 下载部署包
+
+打开 [GitHub Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/latest)，在 Assets 下载 **llm-service-discovery-demo-0.5.1-windows-x64-wsl.zip**。ZIP 已带 JavaScript 依赖、Harness 插件及预构建 Linux/amd64 服务镜像；GitHub 自动生成的 **Source code** 压缩包不包含这些部署材料。
+
+解压到长期保留的本地目录。准备好 Windows x64、Node.js 24+ 和已有的 x86-64 Ubuntu WSL 后，在解压目录执行：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
+```
+
+脚本自动校验、载入镜像，不需要本地构建或 Docker Desktop。首次缺少 Docker static 工具或 Compose 时仍需联网下载；Node、WSL 和 Harness 需自行安装。随后按[插件安装说明](docs/plugin-setup.md)安装 ZIP 内的插件并配置打印出的信任文件和网卡地址。详情见[发行说明](docs/release-notes.md)及 [Windows 快速部署](docs/windows-quickstart.md)。
+
+## 从源码启动
 
 当前实测路线使用**已有的 Ubuntu WSL**，运行项目专用 Docker Engine；两个容器共享 WSL host network/IP，以端口和路径区分服务。不创建新 VM，不使用 Windows 代公告器。
 

@@ -35,16 +35,62 @@ function Test-SameSubnet {
     }
     return $true
 }
+function Read-ReleaseImage {
+    param([string]$RepositoryRoot)
+    $manifestPath = Join-Path $RepositoryRoot 'release-manifest.json'
+    if (-not (Test-Path -LiteralPath $manifestPath)) { return $null }
+    $manifestItem = Get-Item -LiteralPath $manifestPath -Force
+    if ($manifestItem.PSIsContainer -or ($manifestItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'release-manifest.json must be a regular file inside the extracted release.'
+    }
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    $package = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'package.json') -Raw | ConvertFrom-Json
+    if ($manifest.schema -isnot [string] -or $manifest.schema -cne 'llm-discovery-demo-release/v1' -or $manifest.version -isnot [string] -or $manifest.version -cne $package.version) {
+        throw 'The release manifest schema/version does not match this Demo package. Extract the complete release again.'
+    }
+    if ($manifest.image.tag -isnot [string] -or $manifest.image.tag -cne 'llm-discovery-demo:0.5.1') {
+        throw 'The release image tag must be llm-discovery-demo:0.5.1 for this launcher.'
+    }
+    if ($manifest.image.file -isnot [string] -or $manifest.image.file -cnotmatch '^images/[A-Za-z0-9][A-Za-z0-9._-]*\.tar\.gz$') {
+        throw 'The release image must be a relative images/<filename>.tar.gz path without parent traversal.'
+    }
+    if ($manifest.image.sha256 -isnot [string] -or $manifest.image.sha256 -notmatch '^[a-fA-F0-9]{64}$') {
+        throw 'The release image SHA-256 must contain exactly 64 hexadecimal characters.'
+    }
+    if ($null -ne $manifest.image.id -and ($manifest.image.id -isnot [string] -or $manifest.image.id -cnotmatch '^sha256:[a-f0-9]{64}$')) {
+        throw 'The optional release image id must be a Docker sha256 image id.'
+    }
+    $imagePath = [IO.Path]::GetFullPath((Join-Path $RepositoryRoot $manifest.image.file))
+    if (-not $imagePath.StartsWith($RepositoryRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'The release image path escapes the extracted release.'
+    }
+    foreach ($entryPath in @((Join-Path $RepositoryRoot 'images'), $imagePath)) {
+        if (-not (Test-Path -LiteralPath $entryPath)) { throw "The release image archive is missing: $($manifest.image.file). Extract the complete release again." }
+        if ((Get-Item -LiteralPath $entryPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw 'Release images must not use symbolic links or directory junctions.'
+        }
+    }
+    if (-not (Test-Path -LiteralPath $imagePath -PathType Leaf)) { throw 'The release image archive must be a regular file.' }
+    $expectedHash = $manifest.image.sha256.ToLowerInvariant()
+    if ((Get-FileHash -LiteralPath $imagePath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedHash) {
+        throw 'Release image SHA-256 mismatch. Download and extract the complete release again; the archive was not loaded.'
+    }
+    return [PSCustomObject]@{ File = $manifest.image.file; Path = $imagePath; Tag = $manifest.image.tag; Sha256 = $expectedHash; Id = $manifest.image.id }
+}
 
 $problems = [Collections.Generic.List[string]]::new()
+$releaseBundlePresent = Test-Path -LiteralPath (Join-Path $repositoryRoot 'release-manifest.json')
+$releaseImage = $null
+try { $releaseImage = Read-ReleaseImage $repositoryRoot }
+catch { $problems.Add("Invalid release bundle: $($_.Exception.Message)") }
 $nodeVersion = $null
 $nodeReady = [bool](Get-Command node.exe -ErrorAction SilentlyContinue)
 if ($nodeReady) {
     $nodeResult = Read-Command 'node.exe' @('--version')
     $nodeVersion = $nodeResult.Text
-    $nodeReady = $nodeResult.Code -eq 0 -and $nodeVersion -match '^v(\d+)\.' -and [int]$Matches[1] -ge 22
+    $nodeReady = $nodeResult.Code -eq 0 -and $nodeVersion -match '^v(\d+)\.' -and [int]$Matches[1] -ge 24
 }
-if (-not $nodeReady) { $problems.Add('Install Node.js 22 or later on Windows.') }
+if (-not $nodeReady) { $problems.Add('Install Node.js 24 or later on Windows, then open a new PowerShell window. The release does not bundle Node.js.') }
 
 $wslReady = [bool](Get-Command wsl.exe -ErrorAction SilentlyContinue)
 $serviceAddress = $null
@@ -59,6 +105,10 @@ $composeBootstrapRequired = $false
 $baseImageCached = $false
 $staticBinariesPresent = $false
 if ($wslReady) {
+    $architectureResult = Read-Command 'wsl.exe' @('-d', $Distro, '-u', 'root', '--exec', 'uname', '-m')
+    if ($architectureResult.Code -ne 0 -or $architectureResult.Text -cne 'x86_64') {
+        $problems.Add("An existing x86-64 Ubuntu WSL distribution is required. '$Distro' did not report x86_64; install/configure it separately or select it with -Distro.")
+    }
     $ipResult = Read-Command 'wsl.exe' @('-d', $Distro, '-u', 'root', '--exec', 'ip', '-j', '-4', 'address', 'show', 'dev', 'eth0')
     if ($ipResult.Code -eq 0 -and $ipResult.Text.StartsWith('[')) {
         $addresses = @((ConvertFrom-Json $ipResult.Text).addr_info | Where-Object { $_.family -eq 'inet' -and $_.scope -eq 'global' })
@@ -103,8 +153,8 @@ if ($wslReady) {
 $buildVersion = $null
 $buildEndpoint = $null
 $baseArchiveAvailable = Test-Path -LiteralPath (Join-Path $repositoryRoot 'spikes/network/.runtime/node-24-alpine.tar')
-# A cached base makes Desktop irrelevant; avoid waiting on a stopped Desktop engine.
-if (-not $baseImageCached -and -not $baseArchiveAvailable -and (Get-Command docker.exe -ErrorAction SilentlyContinue)) {
+# A release archive or cached base makes Desktop irrelevant; do not contact it.
+if (-not $releaseBundlePresent -and -not $baseImageCached -and -not $baseArchiveAvailable -and (Get-Command docker.exe -ErrorAction SilentlyContinue)) {
     if (-not $DockerContext) {
         $contexts = Read-Command 'docker.exe' @('context', 'ls', '--format', '{{.Name}}')
         if ('desktop-linux' -in ($contexts.Text -split "`n")) { $DockerContext = 'desktop-linux' }
@@ -120,7 +170,7 @@ if (-not $baseImageCached -and -not $baseArchiveAvailable -and (Get-Command dock
     }
 }
 $baseArchiveAvailable = Test-Path -LiteralPath (Join-Path $repositoryRoot 'spikes/network/.runtime/node-24-alpine.tar')
-if (-not $baseImageCached -and -not $baseArchiveAvailable -and -not $buildVersion -and -not $staticBinariesPresent) {
+if (-not $releaseBundlePresent -and -not $baseImageCached -and -not $baseArchiveAvailable -and -not $buildVersion -and -not $staticBinariesPresent) {
     $problems.Add('Provide the cached node:24-alpine image/base tar, or start a local Docker Desktop engine for the one-time base-image export. Runtime builds themselves are offline.')
 }
 
@@ -156,6 +206,8 @@ $report = [PSCustomObject][ordered]@{
     RepositoryWslPath = $repositoryWslPath
     Distro = $Distro
     NodeVersion = $nodeVersion
+    ReleaseBundlePresent = $releaseBundlePresent
+    ReleaseImage = $releaseImage
     DependenciesInstalled = @(@('node-forge', '@llm-discovery/discovery-core', '@llm-discovery/advertiser', 'dsh-lan-discovery', 'multicast-dns', 'dns-packet', 'thunky', '@leichtgewicht/ip-codec') | Where-Object { -not (Test-Path -LiteralPath (Join-Path $repositoryRoot ('node_modules/' + $_ + '/package.json'))) }).Count -eq 0
     ServiceAddress = $serviceAddress
     WindowsInterfaceAddress = $windowsAddress

@@ -4,7 +4,7 @@
 
 ## 安装与配置
 
-先在 Demo 根目录执行 `npm ci --ignore-scripts` 和 `scripts/start-demo.ps1`。完全退出 Harness，然后用该 Desktop 安装自带的 CLI 添加包。替换下面的安装路径，避免用另外安装的 CLI 修改 Desktop profile：
+先运行 Demo 根目录的 `scripts/start-demo.ps1`；Release 部署 ZIP 已带 JavaScript 依赖与镜像，从源码克隆时才需要先执行 `npm ci --ignore-scripts`。完全退出 Harness，然后用该 Desktop 安装自带的 CLI 添加包。替换下面的安装路径，避免用另外安装的 CLI 修改 Desktop profile：
 
 ```powershell
 $dsh = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'

@@ -16,3 +16,7 @@ jobs:
       - run: npm test
       - run: node scripts/verify-components.mjs
       - run: node scripts/prepare-offline-image.mjs
+      - name: Verify Windows release launcher
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./tests/deployment/release-launcher.test.ps1
