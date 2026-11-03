@@ -130,7 +130,7 @@ TLS 认证的是 API 连接；它不为此前的 mDNS 报文提供签名。显�
 
 - Text/Basic 返回含节点、服务标记的确定性文本。模型 token usage 是明确标记的字符数估计。
 - Vision 接受内联图片，检查容器头、计算实际传输字节的 SHA-256，部分格式报告尺寸。它不理解图像内容，也不自动抓取外部图片 URL。
-- Tools 只生成固定 `demo_read_marker`、空参数对象和 call ID。真实 Harness 工具读取客户端 marker 后回传；Mock 检查前序调用与 ID，再返回收到的结果。服务端没有 marker 文件，不能预先伪造该结果。
+- Tools 只生成固定 `demo_read_marker`、空参数对象和 call ID。真实 Harness 工具读取客户端 marker 后回传；Mock 检查前序调用与 ID，再返回收到的结果。容器路线只挂载服务端目录，不包含客户端 marker；原生服务与客户端可能属于同一用户，进程分离不构成文件权限隔离，两条路线均以实际工具执行和调用 ID 关联核验。
 - 服务端不做自主规划、外部工具执行或 Agent 循环。Harness 本身可以执行客户端工具，但这不改变被发现对象仍是 LLM API 的定位。
 - `function_calling` 不等于 `web_search`；前者描述调用结构，后者需要特定搜索工具、执行位置、网络和授权条件。当前演示不提供真实搜索，也不把“容器可出公网”当成搜索能力。作为对照，Ollama 官方搜索示例明确由应用执行单独的搜索 API。[官方搜索说明](https://docs.ollama.com/capabilities/web-search)
 

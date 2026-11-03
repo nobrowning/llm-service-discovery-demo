@@ -12,8 +12,8 @@
 
 | 运行方式 | 附件 | 前提 |
 |---|---|---|
-| macOS、Linux、Windows 原生进程 | `llm-service-discovery-demo-0.6.1-native.zip` | 对应系统/架构的 Node.js 24+ |
-| Windows 客户端 + 两个 Linux 容器 | `llm-service-discovery-demo-0.6.1-windows-x64-wsl.zip` | Windows x64、Node.js 24+、已有 x64 Ubuntu WSL |
+| macOS、Linux、Windows 原生进程 | `llm-service-discovery-demo-0.6.2-native.zip` | 对应系统/架构的 Node.js 24+ |
+| Windows 客户端 + 两个 Linux 容器 | `llm-service-discovery-demo-0.6.2-windows-x64-wsl.zip` | Windows x64、Node.js 24+、已有 x64 Ubuntu WSL |
 
 两个 ZIP 均带 JavaScript 依赖和插件 tgz；只有 WSL 包带预构建 linux/amd64 镜像。Node.js 与 Harness 需另行安装。GitHub 自动提供的 Source code 包需要先执行 `npm ci --ignore-scripts`。
 
@@ -25,15 +25,16 @@ node packages/lab-controller/cli.mjs list-interfaces
 node packages/lab-controller/cli.mjs native run --runtime .runtime/native --interface YOUR_LAN_IPV4
 ```
 
-将 `YOUR_LAN_IPV4` 替换为列表中的本机局域网 IPv4。保持前台终端开启，在另一终端执行：
+将 `YOUR_LAN_IPV4` 替换为列表中的本机局域网 IPv4。保持前台终端开启，在另一终端进入相同的解压目录执行：
 
 ```sh
 node scripts/verify-live.mjs --runtime .runtime/native
 node scripts/verify-lifecycle.mjs --backend native --runtime .runtime/native
-node packages/lab-controller/cli.mjs native stop --runtime .runtime/native
 ```
 
-网卡选择、跨设备信任、权限和 Linux Docker 可选路线见 [原生部署](docs/native-quickstart.md)，Mac 远程测试见 [SSH 连接](docs/mac-ssh-validation.md)。首次在本机生成实验 CA、证书和合成 key，重启保留，不修改系统证书库。
+接入 Harness 时保持服务终端运行。使用结束后执行 `node packages/lab-controller/cli.mjs native stop --runtime .runtime/native`，或在服务终端按 Ctrl+C 停止。
+
+网卡选择、跨设备信任、权限和 Linux Docker 可选路线见 [原生部署](docs/native-quickstart.md)。Mac 用户可按 [Desktop 指南](docs/mac-desktop-quickstart.md)安装插件并检查会话，远程测试见 [SSH 连接](docs/mac-ssh-validation.md)。首次在本机生成实验 CA、证书和合成 key，重启保留，不修改系统证书库。
 
 WSL 包在 Windows PowerShell 中运行：
 
@@ -45,7 +46,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 
 ## 接入 Harness
 
-使用已安装 Harness 自带的 CLI 安装 `vendor/dsh-lan-discovery-0.5.1.tgz`，配置实验信任文件与**客户端本机**网卡。具体见 [插件安装](docs/plugin-setup.md)。Host 兼容版本固定为 **0.2.1-rc.3 / rc.5**；Windows/macOS Desktop、Linux Web Host 评估、服务端独立运行分别验收，实际状态见验证报告。
+使用已安装 Harness 自带的 CLI 安装 `vendor/dsh-lan-discovery-0.5.2.tgz`，配置实验信任文件与**客户端本机**网卡。具体见 [插件安装](docs/plugin-setup.md)。Host 兼容版本固定为 **0.2.1-rc.3 / rc.5**；Windows/macOS Desktop、Linux Web Host 评估、服务端独立运行分别验收，实际状态见验证报告。
 
 打开“局域网服务 / LAN services”，点击一行展开检查、连接与 key 操作。选中不自动连接，收起或切换清除未提交密码。中英文跟随 Harness 语言偏好。发现记录本身不授权向未知服务发送凭据。
 

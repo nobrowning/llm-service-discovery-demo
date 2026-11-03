@@ -1,4 +1,4 @@
-# API key 三状态演示（0.5.0）
+# API key 三状态演示
 
 | 服务 | 初始演示状态 | 操作 |
 |---|---|---|
@@ -12,14 +12,17 @@ A 节点上的 DeepSeek 和 Qwen-VL 共享主机与端口，但使用不同 API 
 
 ## 启动与旧环境更新
 
-新环境可按[原生部署](native-quickstart.md)运行 `native run`，或在 Windows/WSL 使用 `scripts/start-demo.ps1`。安装 `vendor/dsh-lan-discovery-0.5.1.tgz`，详见[插件安装](plugin-setup.md)。下文 `.runtime/current` 是 WSL 默认路径；原生路线改为实际选择的 runtime，例如 `.runtime/native`。macOS/Linux 直接在本机文本编辑器查看 presenter 文件，不需要 PowerShell 辅助脚本。
+新环境可按[原生部署](native-quickstart.md)运行 `native run`，或在 Windows/WSL 使用 `scripts/start-demo.ps1`。安装 `vendor/dsh-lan-discovery-0.5.2.tgz`，详见[插件安装](plugin-setup.md)。下文 `.runtime/current` 是 WSL 默认路径；原生路线改为实际选择的 runtime，例如 `.runtime/native`。macOS/Linux 直接在本机文本编辑器查看 presenter 文件，不需要 PowerShell 辅助脚本。
 
-如果此前运行过四服务版本，先断开 LAN 连接并完全退出 Harness，然后执行：
+如果此前运行过四服务版本，先断开 LAN 连接并完全退出 Harness，停止该 runtime 的服务后再迁移。Windows/WSL 默认 runtime 执行：
 
 ```powershell
+.\scripts\stop-demo.ps1
 node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime .runtime/current
 .\scripts\start-demo.ps1
 ```
+
+原生路线先运行 `node packages/lab-controller/cli.mjs native stop --runtime .runtime/native`，用相同 runtime 执行迁移，再按原启动命令运行；已有目录不是 `.runtime/native` 时替换为实际路径。
 
 迁移保留 run ID、保留服务的端点、证书、私钥、服务端 key 和 marker；移除 C Basic 的配置与信任项，并解除旧 `tokenFile` 引用。旧 key 文件仍保留。启动仅在本项目中清理已经退役的 node-c 容器。迁移可重复执行，但不会替用户保存任何 key；不要在活动会话中迁移。
 

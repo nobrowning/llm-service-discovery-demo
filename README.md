@@ -12,8 +12,8 @@ Choose an asset from [GitHub Releases](https://github.com/nobrowning/llm-service
 
 | Deployment | Asset | Prerequisites |
 |---|---|---|
-| Native processes on macOS, Linux or Windows | `llm-service-discovery-demo-0.6.1-native.zip` | Node.js 24+ for your OS/architecture |
-| Two Linux containers, Windows client | `llm-service-discovery-demo-0.6.1-windows-x64-wsl.zip` | Windows x64, Node.js 24+, existing x64 Ubuntu WSL |
+| Native processes on macOS, Linux or Windows | `llm-service-discovery-demo-0.6.2-native.zip` | Node.js 24+ for your OS/architecture |
+| Two Linux containers, Windows client | `llm-service-discovery-demo-0.6.2-windows-x64-wsl.zip` | Windows x64, Node.js 24+, existing x64 Ubuntu WSL |
 
 Both contain JavaScript dependencies and the plugin tgz. Only the WSL ZIP contains the prebuilt linux/amd64 image. Node.js and Harness are installed separately. GitHub's automatic **Source code** archives require `npm ci --ignore-scripts` first.
 
@@ -25,15 +25,16 @@ node packages/lab-controller/cli.mjs list-interfaces
 node packages/lab-controller/cli.mjs native run --runtime .runtime/native --interface YOUR_LAN_IPV4
 ```
 
-Replace `YOUR_LAN_IPV4` with a local address from the list. Keep the foreground terminal open. In another terminal:
+Replace `YOUR_LAN_IPV4` with a local address from the list. Keep the foreground terminal open. In another terminal, enter the same extracted directory:
 
 ```sh
 node scripts/verify-live.mjs --runtime .runtime/native
 node scripts/verify-lifecycle.mjs --backend native --runtime .runtime/native
-node packages/lab-controller/cli.mjs native stop --runtime .runtime/native
 ```
 
-See [native setup](docs/native-quickstart.md) for interface selection, cross-device trust, permissions and optional Linux Docker Engine instructions. For remote Mac testing, see [SSH setup](docs/mac-ssh-validation.md). Runtime certificates and synthetic keys are generated locally and retained across restarts.
+Keep the service terminal running while using Harness. When finished, stop with `node packages/lab-controller/cli.mjs native stop --runtime .runtime/native` or Ctrl+C in that terminal.
+
+See [native setup](docs/native-quickstart.md) for interface selection, cross-device trust, permissions and optional Linux Docker Engine instructions. Mac users can follow the [Desktop guide](docs/mac-desktop-quickstart.md) for plugin installation and conversation checks, or [SSH setup](docs/mac-ssh-validation.md) for remote testing. Runtime certificates and synthetic keys are generated locally and retained across restarts.
 
 For the WSL ZIP, use Windows PowerShell:
 
@@ -45,7 +46,7 @@ The launcher verifies/imports the bundled image into the project daemon. First-t
 
 ## Harness client
 
-Install `vendor/dsh-lan-discovery-0.5.1.tgz` using the CLI belonging to your Harness installation, then set the trust file and the **client's** local network interface. See [plugin setup](docs/plugin-setup.md). Host compatibility is pinned to **0.2.1-rc.3 / rc.5**. Windows/macOS Desktop, Linux Web Host evaluation, and standalone service execution have separate acceptance requirements.
+Install `vendor/dsh-lan-discovery-0.5.2.tgz` using the CLI belonging to your Harness installation, then set the trust file and the **client's** local network interface. See [plugin setup](docs/plugin-setup.md). Host compatibility is pinned to **0.2.1-rc.3 / rc.5**. Windows/macOS Desktop, Linux Web Host evaluation, and standalone service execution have separate acceptance requirements.
 
 Open **LAN services / 局域网服务**. Select a row to reveal inspection, connection and API key controls. Selection does not connect automatically; collapse/switch clears unsent passwords. English/Chinese follows Harness's locale preference. Discovery alone never authorizes sending credentials.
 

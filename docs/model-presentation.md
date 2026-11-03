@@ -22,6 +22,6 @@
 
 显示名称、参数量、版本和量化 / 精度通过实验能力接口返回，不加入发现草案的 TXT 标准字段。`display_name` 与 `deployment` 是可选展示元数据；请求继续使用稳定的 `mock-text`、`mock-vision`、`mock-tools` 模型 ID，旧脚本和已验证的响应协议保持兼容。Harness 模型菜单使用展示名称。
 
-已有 runtime 的默认展示值由服务启动时兼容映射到新版；自定义配置优先。旧四服务 runtime 在 Harness 退出后显式执行 `node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime .runtime/current`，再重建服务。迁移保留 Key、证书、marker 和 runId，移除 C 的配置与授权、解除旧 tokenFile 引用。演示前展开 GLM 保存一次 key，Vision 保持未配置，步骤见 [API key 演示](api-key-demo.md)。已保存 key 不自动等于已检查能力、当前 key 仍有效或服务可达。
+已有 runtime 的默认展示值由服务启动时兼容映射到新版；自定义配置优先。旧四服务 runtime 在 Harness 完全退出、该 runtime 的服务停止后显式执行 `node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime .runtime/current`，再启动服务；使用其他 runtime 时替换为实际目录。迁移保留 Key、证书、marker 和 runId，移除 C 的配置与授权、解除旧 tokenFile 引用。演示前展开 GLM 保存一次 key，Vision 保持未配置，步骤见 [API key 演示](api-key-demo.md)。已保存 key 不自动等于已检查能力、当前 key 仍有效或服务可达。
 
 这些 Demo Key 只在本地 Mock 中有效，不是真实模型厂商凭据。插件不会自动加载 presenter 文件；它不进入服务端卷或公开证据包，整个 `.runtime/` 已被 Git 忽略。需要 Key 的 Tools 服务仍使用服务端内部 HMAC 签名校验函数调用关联，该签名密钥独立于客户端 API Key。

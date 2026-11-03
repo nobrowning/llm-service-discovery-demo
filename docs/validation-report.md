@@ -1,8 +1,31 @@
 # 验证报告
 
-更新日期：2026-11-03。当前 Demo 0.6.1 随附 core/公告器 0.3.1、插件 0.5.1，支持原生两个进程或 Windows/WSL 两容器，共三项服务。各版本的实测范围分别记录；历史结果不替代当前版本验收。
+更新日期：2026-11-04。当前 Demo 0.6.2 随附 core/公告器 0.3.1、插件 0.5.2，支持原生两个进程或 Windows/WSL 两容器，共三项服务。各版本的实测范围分别记录；历史结果不替代当前版本验收。
 
-## 0.6.x 跨平台验证
+## 0.6.2 macOS Harness 适配
+
+实机为 Apple Silicon Mac（macOS 27.2 / arm64），安装官方 DeepSeek Harness Desktop 0.2.1-rc.5，内置 Node 24.21.0 / Electron 44.7.0。插件通过该 App 自带 CLI 安装，使用独立生成的 Demo 信任与合成凭据。保留原 profile、默认模型和已有会话；隔离官方 Host 的检查另用测试 profile。
+
+实际 Desktop 最初无法发现服务，而同机器命令行可发现。候选插件 `0.5.2-macos.1` 修复 core 的 `event.error` 被控制器丢弃的问题后，页面显示 `recvmsg EHOSTUNREACH` / `send EHOSTUNREACH 224.0.0.251:5353`。用户在系统设置开启 Harness 本地网络权限后，同一 Desktop 自动出现三项服务，错误不再新增。未修改应用签名或系统隐私数据库。诊断文本移除控制字符、限制为 512 字符，不复制任意传输元数据；Host 状态路由和中英界面均有回归测试。
+
+| 检查层次 | 已取得的证据 |
+|---|---|
+| 实际 Desktop 安装与界面 | 内置 CLI 安装、插件管理页、侧栏与页面注册、中英即时切换通过 |
+| 实际 Desktop 发现与网络权限 | 三项服务、撤回/恢复时 3→2→3；本地网络权限放行后 mDNS 恢复 |
+| 实际 Desktop 文本与恢复 | 免 key 的真实原生会话返回 Mock 回显；GLM 缺 key 拒绝；断开与完整退出后冷启动均恢复原 DeepSeek-V4.1-Flash / High |
+| 实际 Desktop 图片与工具 | GUI 上传 PNG 的回执为 91 字节、16×16，SHA-256 与原文件一致；原生工具读取结果与本地 marker 一致，call ID 与后续响应正确关联 |
+| 实际 Desktop 凭据与重启 | 错误 key 被拒绝，正确 key 通过 UI 验证；GLM 显示“已保存”，Qwen 显示“本次运行”。完整重启后 GLM 无需重填即完成新会话，Qwen 回到需要 key |
+| 隔离的官方 rc.5 Host API | 缺 key/错 key 拒绝、保存及仅本次凭据、错误替换保留旧 key、重启后保存 key 可复用且会话 key 清除；真实文本会话通过 |
+| 隔离 Host 图像与原生工具 | 91 字节 PNG 在输入、Host 保存与服务接收处 SHA-256 一致；官方原生 `demo_read_marker` 的 call/result/后续响应关联一致，marker 未预置在提问中 |
+| 无用户默认模型覆盖的全新 profile | Host 仍提供内置默认模型；连接、断开恢复和冷启动恢复通过。未将其误称为“Host 缺少默认模型服务” |
+
+Desktop 图像/工具分别经实际 UI 提交与会话证据核验；隔离 Host 结果另行保留，两者都不是 Linux Web UI 验收。隔离工具检查最初错误地要求可选 console logger 行；官方 Host 没有配置该日志输出，改为核对同一原生会话的持久 call/result/response 证据后通过。
+
+实测限制：连接 LAN 模型时在插件管理页禁用再启用，rc.5 报 `HMR transactions cannot be nested`，默认恢复保持待处理，新的会话暂时没有可用的 LAN 路由。恢复日志仍保留 baseline/lastWritten；实际点击“断开并恢复默认模型”后错误与日志清除，原默认模型恢复。保持待恢复状态直接完整退出再启动，也已实测恢复。公开指南要求升级、禁用、卸载前先断开，不将冷启动恢复通过描述为热重载完全通过。
+
+插件候选代码在 [五平台 CI](https://github.com/nobrowning/dsh-lan-discovery/actions/runs/41668508007) 通过 51 项测试及空缓存离线安装；最终 `v0.5.2` 的[发布矩阵](https://github.com/nobrowning/dsh-lan-discovery/actions/runs/41669682354)也全通过。Demo 随附的同一 Linux CI tgz SHA-256 为 `c76e1a7d5071581a239bf838b3a89561febe5d99139e199e32d3e5cf5cdbbc8c`，Windows 从最终 tag 的 LF 源码独立核对 bundle 并空缓存离线安装通过。新打包回归直接比较实际 tarball 的完整 SHA-256 和文件名，支持预发布版本。Mac 端安装、网络权限与完整操作步骤见 [macOS Desktop 指南](mac-desktop-quickstart.md)。以下 0.6.1 的网络与组件结果作为历史基线保留。
+
+## 0.6.1 跨平台验证
 
 真实 Mac 通过同局域网 SSH 连接，复用用户现有受信主机记录与密钥，在独立用户目录解压官方 Node 24.22.2 arm64（核对官方 SHA-256），没有安装全局 npm 包或改动系统证书。Mac 系统命令返回 macOS 27.2 / Darwin 27.2.0，架构 arm64。Linux 为现有 Ubuntu WSL 的 x64 环境，使用独立目录中的 Node 24.22.2；这不等于独立物理 Linux 主机验收。
 
@@ -23,7 +46,7 @@
 
 Linux 测试暂时停止原项目的两个 WSL 容器，结束后恢复同一容器 ID；未替换其旧运行凭据。Mac/Linux 的组件安装验证与 Demo 实跑分别记录。发布工作流在最终 tag 生成新资产，下载校验后才公开，最终附件的验收结果记录在 Release 说明中。
 
-仍未声称完成：Mac 上 Harness 图形界面的文本/图像/工具会话，Linux Web Host 的 UI/凭据/重启行为，Linux 独立物理网络与 Avahi 共存，macOS Intel/Linux ARM64 实体硬件，Windows ARM64，Mac Docker Desktop 组播或多架构预构建镜像。CI 包验证不能替代这些实机/界面验收。
+该轮尚未验证 Mac 上 Harness 图形界面的文本/图像/工具会话；后续结果见上方 0.6.2 记录。仍未声称完成 Linux Web Host 的 UI/凭据/重启行为、Linux 独立物理网络与 Avahi 共存、macOS Intel/Linux ARM64 实体硬件、Windows ARM64、Mac Docker Desktop 组播或多架构预构建镜像。CI 包验证不能替代这些实机/界面验收。
 
 ## 0.5.1 Release 部署验证
 

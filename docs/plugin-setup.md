@@ -1,21 +1,23 @@
 # Harness 插件安装
 
-插件源码位于 [dsh-lan-discovery](https://github.com/nobrowning/dsh-lan-discovery)。Demo 随附经过版本锁定的 `vendor/dsh-lan-discovery-0.5.1.tgz`，可直接安装，不需要另克隆插件仓库。Host 兼容版本为 **0.2.1-rc.3 和 0.2.1-rc.5**；平台、Host 与实际界面验收范围见[验证报告](validation-report.md)。
+插件源码位于 [dsh-lan-discovery](https://github.com/nobrowning/dsh-lan-discovery)。Demo 随附经过版本锁定的 `vendor/dsh-lan-discovery-0.5.2.tgz`，可直接安装，不需要另克隆插件仓库。Host 兼容版本为 **0.2.1-rc.3 和 0.2.1-rc.5**；平台、Host 与实际界面验收范围见[验证报告](validation-report.md)。
 
 ## 安装与配置
+
+macOS 用户可按[完整 Desktop 指南](mac-desktop-quickstart.md)完成应用初始化、插件配置、本地网络权限与真实会话检查。
 
 先按[原生部署](native-quickstart.md)启动；Windows/WSL 路线使用 `scripts/start-demo.ps1`。Release ZIP 已带 JavaScript 依赖，从源码克隆时先执行 `npm ci --ignore-scripts`。首次安装 Harness 时，先启动 Desktop 一次以初始化 profile，再完全退出；使用该 Desktop 安装自带的 CLI 添加包。替换下面的安装路径：
 
 ```powershell
 $dsh = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-& $dsh plugin --profile desktop add (Join-Path (Get-Location) 'vendor/dsh-lan-discovery-0.5.1.tgz') --ignore-scripts
+& $dsh plugin --profile desktop add (Join-Path (Get-Location) 'vendor/dsh-lan-discovery-0.5.2.tgz') --ignore-scripts
 ```
 
 macOS 使用已安装 `.app` 内的 CLI；以实际应用名为准：
 
 ```sh
 DSH='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh'
-"$DSH" plugin --profile desktop add "$PWD/vendor/dsh-lan-discovery-0.5.1.tgz" --ignore-scripts
+"$DSH" plugin --profile desktop add "$PWD/vendor/dsh-lan-discovery-0.5.2.tgz" --ignore-scripts
 ```
 
 不要假定 npm 全局 CLI 与桌面 Host 版本一致。Linux 可单独运行发现服务与验证器；官方 Desktop 未提供 Linux 发布目标，Web Host 的 UI/生命周期/凭据能力需单独验收，详见插件仓库的 [平台说明](https://github.com/nobrowning/dsh-lan-discovery/blob/main/docs/platform-support.md)。

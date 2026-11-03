@@ -1,10 +1,10 @@
 # macOS、Linux 与 Windows 原生启动
 
-本路线从 0.6.1 起提供。两个本机 Node.js 子进程各自提供 Mock HTTPS API 和 mDNS 公告，共三项服务；需要 Node.js 24+，无需 Docker、WSL 或模型。macOS Apple Silicon/Intel、Linux arm64/x64 使用对应架构的 Node；Windows x64 同样使用此入口。实际覆盖见 [验证报告](validation-report.md)，支持的 Harness Host 与服务端运行平台分开判断。
+本路线从公开 Release 0.6.1 起提供。两个本机 Node.js 子进程各自提供 Mock HTTPS API 和 mDNS 公告，共三项服务；需要 Node.js 24+，无需 Docker、WSL 或模型。macOS Apple Silicon/Intel、Linux arm64/x64 使用对应架构的 Node；Windows x64 同样使用此入口。实际覆盖见 [验证报告](validation-report.md)，支持的 Harness Host 与服务端运行平台分开判断。
 
 ## 下载与校验
 
-从 [Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/latest) 下载 `llm-service-discovery-demo-0.6.1-native.zip` 和同页 `SHA256SUMS`。先核对 ZIP 的 SHA-256：macOS 使用 `shasum -a 256 文件.zip`，Linux 使用 `sha256sum 文件.zip`，Windows PowerShell 使用 `Get-FileHash 文件.zip -Algorithm SHA256`。核对值来自同次 Release。
+从 [Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/latest) 下载 `llm-service-discovery-demo-0.6.2-native.zip` 和同页 `SHA256SUMS`。先核对 ZIP 的 SHA-256：macOS 使用 `shasum -a 256 文件.zip`，Linux 使用 `sha256sum 文件.zip`，Windows PowerShell 使用 `Get-FileHash 文件.zip -Algorithm SHA256`。核对值来自同次 Release。
 
 解压后进入目录。ZIP 已含 JavaScript 依赖和组件 tgz，不包含 Node.js、Harness 或运行凭据。GitHub 自动生成的 Source code 包则需要先执行 `npm ci --ignore-scripts`；源码没有发行清单，跳过下方的 `verify-release-files.mjs`（该命令仅用于部署 ZIP），其他指令相同。
 
@@ -32,10 +32,11 @@ node packages/lab-controller/cli.mjs native run --runtime .runtime/native --inte
 node packages/lab-controller/cli.mjs native status --runtime .runtime/native
 node scripts/verify-live.mjs --runtime .runtime/native
 node scripts/verify-lifecycle.mjs --backend native --runtime .runtime/native
-node packages/lab-controller/cli.mjs native stop --runtime .runtime/native
 ```
 
-`verify-live` 使用真实 mDNS、插件 TLS 信任和 Responses adapter，检查文本、图像、流式响应、认证及工具往返；它会读取本实验生成的服务端测试 key，不是 Harness 界面验收。生命周期检查临时撤销 A 的文本服务再恢复，期望 3→2→3。`native stop` 或前台 Ctrl+C 撤销公告、停止本次两个子进程；凭据保留。控制通道仅监听回环地址，随机凭据保存在 runtime 中，不通过任意 PID 结束进程。
+`verify-live` 使用真实 mDNS、插件 TLS 信任和 Responses adapter，检查文本、图像、流式响应、认证及工具往返；它会读取本实验生成的服务端测试 key，不是 Harness 界面验收。生命周期检查临时撤销 A 的文本服务再恢复，期望 3→2→3。接入 Harness 或另一台客户端时保持服务终端运行。
+
+使用结束后执行 `node packages/lab-controller/cli.mjs native stop --runtime .runtime/native`，或在前台按 Ctrl+C，撤销公告并停止本次两个子进程；凭据保留。控制通道仅监听回环地址，随机凭据保存在 runtime 中，不通过任意 PID 结束进程。
 
 ## 另一台电脑作为客户端
 

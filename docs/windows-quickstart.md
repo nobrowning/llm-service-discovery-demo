@@ -54,9 +54,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 1. 缺少项目依赖时执行 `npm ci --ignore-scripts`。
 2. 启动独立 daemon：`/var/tmp/llm-discovery-docker-0`。该 daemon 使用专用 socket、数据和日志目录，禁止 bridge、iptables/ip6tables、IP forwarding 和 masquerade 修改。
    Docker CLI 与 Compose 使用项目自己的配置目录 `spikes/network/.runtime/docker-cli`。若需要初始化 Compose，会先校验官方固定版本的 SHA-256；不修改用户 Docker 配置或系统 CLI 链接。
-3. 部署包校验并加载清单指定的 `images/llm-discovery-demo-0.6.1.tar.gz`。源码路线优先使用隔离 daemon 中缓存的 `node:24-alpine`；其次加载 `spikes/network/.runtime/node-24-alpine.tar`。仅缺少缓存时，才从本机 Docker Desktop 导出基础镜像。
+3. 部署包校验并加载清单指定的 `images/llm-discovery-demo-0.6.2.tar.gz`。源码路线优先使用隔离 daemon 中缓存的 `node:24-alpine`；其次加载 `spikes/network/.runtime/node-24-alpine.tar`。仅缺少缓存时，才从本机 Docker Desktop 导出基础镜像。
 4. 复用 `.runtime/current` 中的 token、证书和客户端信任；第一次使用空目录时才初始化。
-5. 部署包核对加载后的 `llm-discovery-demo:0.6.1` 镜像，不执行构建。源码路线执行 `scripts/prepare-offline-image.mjs`，在隔离 daemon 中以 `--pull=false` 构建同名镜像。
+5. 部署包核对加载后的 `llm-discovery-demo:0.6.2` 镜像，不执行构建。源码路线执行 `scripts/prepare-offline-image.mjs`，在隔离 daemon 中以 `--pull=false` 构建同名镜像。
 6. 生成该 runtime 的 Compose 挂载 override，只挂载 `server` 目录；启动 `llm-discovery-demo` 项目的两个节点，并只清理该项目中退役的 node-c 容器。
 7. 从 Windows 进行 10 秒真实 mDNS 发现，检查三项服务，并保存 `discovery-latest.json`。
 
@@ -70,9 +70,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 
 ## 旧四服务目录迁移
 
-先断开 LAN 并完全退出 Harness，再显式执行：
+先断开 LAN 并完全退出 Harness，停止旧服务后再显式迁移：
 
 ```powershell
+.\scripts\stop-demo.ps1
 node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime .runtime/current
 .\scripts\start-demo.ps1
 ```
@@ -96,7 +97,7 @@ node packages/lab-controller/cli.mjs migrate-three-state-demo --runtime .runtime
 安装插件前完全退出 Harness，再使用当前安装版自带 CLI 安装本仓库的插件包。将以下应用路径替换为自己的 Harness 安装位置，在 Demo 根目录运行：
 
 ```powershell
-& 'C:\path\to\DeepseekHarness\resources\runtime\cli\bin\dsh.cmd' plugin --profile desktop add (Join-Path $PWD 'vendor/dsh-lan-discovery-0.5.0.tgz')
+& 'C:\path\to\DeepseekHarness\resources\runtime\cli\bin\dsh.cmd' plugin --profile desktop add (Join-Path $PWD 'vendor/dsh-lan-discovery-0.5.2.tgz')
 ```
 
 这会安装打包版本，日常运行不需要保留插件源码 checkout。配置、升级和断开恢复步骤见插件安装说明。独立插件默认关闭演示行为；本 Demo 需按说明显式设置 `demoMode: true`，启用固定 marker 工具和 Mock 上下文标注。插件界面优先跟随 Harness 语言偏好，没有偏好时按系统语言选择，支持中文与英语。
