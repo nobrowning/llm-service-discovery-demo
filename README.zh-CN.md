@@ -8,12 +8,12 @@
 
 ## 下载运行
 
-在 [GitHub Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/latest) 选择附件，与同页 `SHA256SUMS` 核对 SHA-256 后解压。
+在 [GitHub Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/tag/v0.7.0-roaming.1) 选择附件，与同页 `SHA256SUMS` 核对 SHA-256 后解压。
 
 | 运行方式 | 附件 | 前提 |
 |---|---|---|
-| macOS、Linux、Windows 原生进程 | `llm-service-discovery-demo-0.6.2-native.zip` | 对应系统/架构的 Node.js 24+ |
-| Windows 客户端 + 两个 Linux 容器 | `llm-service-discovery-demo-0.6.2-windows-x64-wsl.zip` | Windows x64、Node.js 24+、已有 x64 Ubuntu WSL |
+| macOS、Linux、Windows 原生进程 | `llm-service-discovery-demo-0.7.0-roaming.1-native.zip` | 对应系统/架构的 Node.js 24+ |
+| Windows 客户端 + 两个 Linux 容器 | `llm-service-discovery-demo-0.7.0-roaming.1-windows-x64-wsl.zip` | Windows x64、Node.js 24+、已有 x64 Ubuntu WSL |
 
 两个 ZIP 均带 JavaScript 依赖和插件 tgz；只有 WSL 包带预构建 linux/amd64 镜像。Node.js 与 Harness 需另行安装。GitHub 自动提供的 Source code 包需要先执行 `npm ci --ignore-scripts`。
 
@@ -46,7 +46,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 
 ## 接入 Harness
 
-使用已安装 Harness 自带的 CLI 安装 `vendor/dsh-lan-discovery-0.5.2.tgz`，配置实验信任文件与**客户端本机**网卡。具体见 [插件安装](docs/plugin-setup.md)。Host 兼容版本固定为 **0.2.1-rc.3 / rc.5**；Windows/macOS Desktop、Linux Web Host 评估、服务端独立运行分别验收，实际状态见验证报告。
+使用已安装 Harness 自带的 CLI 安装 `vendor/dsh-lan-discovery-0.6.0-roaming.1.tgz`，配置实验信任文件与 `interfaceMode: auto`，跟随客户端当前 LAN 网络。具体见 [插件安装](docs/plugin-setup.md)。Host 兼容版本固定为 **0.2.1-rc.3 / rc.5**；Windows/macOS Desktop、Linux Web Host 评估、服务端独立运行分别验收，实际状态见验证报告。
 
 打开“局域网服务 / LAN services”，点击一行展开检查、连接与 key 操作。选中不自动连接，收起或切换清除未提交密码。中英文跟随 Harness 语言偏好。发现记录本身不授权向未知服务发送凭据。
 
@@ -71,3 +71,9 @@ CI 配置 Windows x64、Linux x64/arm64、macOS x64/arm64 与 Node 24。纯 Java
 - [历史 Windows 网络调查](docs/network-spike.md)
 
 发现核心库、公告器、插件各有独立仓库，Demo 通过 `vendor/` 中版本化包安装，无需相邻源码目录。四项目采用 [MIT](LICENSE)，尚未发布 npm 或镜像 registry。运行目录、证书、key 和用户 profile 不进入发布包。
+
+## 公司到家候选版
+
+本预发布版本随附自动重新发现能力。新 runtime 可用 `--scene company` 或 `--scene home`：公司展示 DeepSeek-R1-Distill-Qwen-32B（Q4_K_M）、Qwen2.5-VL-7B-Instruct（BF16）和 GLM-4-9B-Chat（INT4）；家庭展示 Qwen3-8B（Q8_0）。这些是模拟部署元数据，不表示运行了真实模型权重。已有 runtime 的 Key 和证书保持原样，更换场景需使用新目录。具体见[模型展示](docs/model-presentation.md)及区分受控界面与物理网卡核验的[验证报告](docs/validation-report.md)。
+
+[公司到家验收记录](docs/company-home-validation.md)分别记录受控界面与真实接口切换的证据和边界。

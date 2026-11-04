@@ -10,7 +10,42 @@
 | A / Studio Workstation | Qwen2.5-VL-7B-Instruct | 7B | BF16 | 2.5-VL | 图像 | 尚未填写 |
 | B / `192.0.2.51` | GLM-4-9B-Chat | 9B | INT4 | 4 | 工具调用 | 已保存 |
 
-部署位置使用友好名称与实际 IP：A 的两个服务显示同一名称 Studio Workstation；B 使用本次部署的实际 IP。展开协议与地址，可看到各服务实际使用的 `llm-<runId>-a.local` 或 `llm-<runId>-b.local` 主机名。上表 IP 是脱敏后的文档示例，实际值读取运行配置；`<runId>` 随部署生成，不是固定地址。轻量模式中的两个容器共享一个 WSL IP，服务由端口和路径区分。位置栏的 IP 显示不改变 HTTPS 连接使用的主机名或 TLS 身份验证。
+## 「公司到家」展示 profile
+
+像连接 Wi-Fi 后寻找所在网络的打印机一样，用户离开公司、回到家中，希望客户端重新发现当前环境提供的 LLM 服务。服务名称带上场景和具体型号，方便观众区分两边的资源；重新发现后仍需独立授权和显式接入，不能因名称相近就继承另一环境的凭据。
+
+新 runtime 可选择 `--scene company` 或 `--scene home`。不传该参数时，保持上面的标准三服务演示。profile 仅配置展示信息与初始启用状态，不改变 Mock API 的技术模型 ID、路径或认证方式，也不下载或运行对应的模型权重。
+
+| 场景 | 列表展示名称 | 标称规模 | 版本 | 量化 / 精度 | 技术模型 ID | 初始启用 / 认证 |
+|---|---|---|---|---|---|---|
+| 公司 | 公司·DeepSeek-R1-Distill-Qwen-32B | 32B | R1 | Q4_K_M | `mock-text` | 是 / 无需 Key |
+| 公司 | 公司·Qwen2.5-VL-7B-Instruct | 7B | 2.5-VL | BF16 | `mock-vision` | 是 / 需要独立 Key |
+| 公司 | 公司·GLM-4-9B-Chat | 9B | 4 | INT4 | `mock-tools` | 是 / 需要独立 Key |
+| 家庭 | 家庭·Qwen3-8B | 8B | 3 | Q8_0 | `mock-text` | 是 / 无需 Key |
+
+家庭 profile 将 `a-text` 的展示信息切换为 Qwen3-8B，继续使用 `/text/v1` 和 `mock-text`。`a-vision`、`b-tools` 的配置和独立凭据仍保留，但初始禁用、不广播，通过认证后的 API 请求返回不可用；家庭服务列表只有上述一项。两个原生节点进程仍由同一个控制器管理。Q8_0 同样只是模拟部署规格，不能据此推断真实量化效果或性能。
+
+先用 `doctor` 确认服务所在网络的实际 IPv4。下面使用文档示例地址，运行前须替换为本机在各网络上的实际地址：
+
+```sh
+node packages/lab-controller/cli.mjs doctor
+
+# 公司网络：创建并运行公司 profile；按 Ctrl+C 停止所属节点。
+node packages/lab-controller/cli.mjs native run --scene company --runtime .runtime/company --interface 192.0.2.10
+
+# 手动切换到家庭网络后，再用当前地址运行家庭 profile。
+node packages/lab-controller/cli.mjs native run --scene home --runtime .runtime/home --interface 198.51.100.20
+```
+
+如只需生成配置，使用 `init --scene company --runtime .runtime/company --address 192.0.2.10 --interface 192.0.2.10`，家庭同理。两个 profile 默认占用相同的 HTTPS 端口，不能在同一台机器上同时启动；上述命令不会替用户切换 Wi-Fi，也不会自动建立客户端信任。应分别使用新目录内的 `client/trust.json` 配置信任，并由用户决定接入哪个服务。修改显示名称不构成授权，客户端不会从 presenter 文件自动导入 Key。
+
+profile 在初始化时固定。复用已有目录时可以省略 `--scene`，或指定相同场景；指定不同场景会被拒绝，要求选择新目录。相同地址下的复用不会重写配置、Key、证书、marker 或 `runId`。在新目录创建家庭 profile 会生成独立的身份材料，不会把公司凭据复制过来。原有默认 runtime 也不会因新增 profile 自动改名。
+
+脚本可复用 `packages/lab-controller/scene-profile.mjs` 的 `servicesForScene(nodeId, scene)` 获取服务配置；它返回新的对象，不修改默认模型定义或运行中的实例。受控场景演示与真实物理切网验收应分别标注，不能仅凭换了 profile 就声称验证了自动切网发现。
+
+## 展示字段与信任边界
+
+部署位置使用友好名称与实际 IP：A 的两个服务显示同一名称 Studio Workstation；B 使用本次部署的实际 IP。展开协议与地址，可看到各服务实际使用的 `llm-<runId>-a.local` 或 `llm-<runId>-b.local` 主机名。标准场景表中的 IP 是脱敏后的文档示例，实际值读取运行配置；`<runId>` 随部署生成，不是固定地址。轻量模式中的两个容器共享一个 WSL IP，服务由端口和路径区分。位置栏的 IP 显示不改变 HTTPS 连接使用的主机名或 TLS 身份验证。
 
 名称及型号规模依据发布者的模型卡：[DeepSeek R1 Distill Qwen 32B](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B)、[Qwen2.5-VL-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct)、[GLM-4-9B-Chat](https://huggingface.co/zai-org/glm-4-9b-chat)。参数量采用型号标称值，不作为精确权重计数。
 

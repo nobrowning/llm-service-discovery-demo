@@ -1,6 +1,6 @@
 # Harness 插件安装
 
-插件源码位于 [dsh-lan-discovery](https://github.com/nobrowning/dsh-lan-discovery)。Demo 随附经过版本锁定的 `vendor/dsh-lan-discovery-0.5.2.tgz`，可直接安装，不需要另克隆插件仓库。Host 兼容版本为 **0.2.1-rc.3 和 0.2.1-rc.5**；平台、Host 与实际界面验收范围见[验证报告](validation-report.md)。
+插件源码位于 [dsh-lan-discovery](https://github.com/nobrowning/dsh-lan-discovery)。Demo 随附经过版本锁定的 `vendor/dsh-lan-discovery-0.6.0-roaming.1.tgz`，可直接安装，不需要另克隆插件仓库。Host 兼容版本为 **0.2.1-rc.3 和 0.2.1-rc.5**；平台、Host 与实际界面验收范围见[验证报告](validation-report.md)。
 
 ## 安装与配置
 
@@ -10,31 +10,33 @@ macOS 用户可按[完整 Desktop 指南](mac-desktop-quickstart.md)完成应用
 
 ```powershell
 $dsh = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-& $dsh plugin --profile desktop add (Join-Path (Get-Location) 'vendor/dsh-lan-discovery-0.5.2.tgz') --ignore-scripts
+& $dsh plugin --profile desktop add (Join-Path (Get-Location) 'vendor/dsh-lan-discovery-0.6.0-roaming.1.tgz') --ignore-scripts
 ```
 
 macOS 使用已安装 `.app` 内的 CLI；以实际应用名为准：
 
 ```sh
 DSH='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh'
-"$DSH" plugin --profile desktop add "$PWD/vendor/dsh-lan-discovery-0.5.2.tgz" --ignore-scripts
+"$DSH" plugin --profile desktop add "$PWD/vendor/dsh-lan-discovery-0.6.0-roaming.1.tgz" --ignore-scripts
 ```
 
 不要假定 npm 全局 CLI 与桌面 Host 版本一致。Linux 可单独运行发现服务与验证器；官方 Desktop 未提供 Linux 发布目标，Web Host 的 UI/生命周期/凭据能力需单独验收，详见插件仓库的 [平台说明](https://github.com/nobrowning/dsh-lan-discovery/blob/main/docs/platform-support.md)。
 
-配置 profile 中已有的 `lan-discovery` 行，保留其他字段与插件。使用启动时打印的信任文件路径，以及客户端自己所选接口的 IPv4：
+配置 profile 中已有的 `lan-discovery` 行，保留其他字段与插件。使用启动时打印的信任文件路径，并选择自动跟随客户端网络：
 
 ```yaml
 - id: lan-discovery
   config:
     trustFile: 'C:\Path\To\Demo\.runtime\current\client\trust.json'
-    interfaceAddress: 'CLIENT_LOCAL_IPV4'
+    interfaceMode: 'auto'
     networkId: 'ietf-demo'
     autoStart: true
     demoMode: true
 ```
 
-原生路线默认示例 runtime 为 `.runtime/native`；Unix 上改为真实绝对路径，例如 `/Users/alice/demo/.runtime/native/client/trust.json`。配置不会展开 `~`、`$HOME` 或 `%USERPROFILE%`。跨设备使用服务端通过可信通道提供的 `client/` 信任目录，接口则选择客户端自己的 LAN 地址。默认状态文件写在 trustFile 同目录；若信任文件放在只读目录，显式配置可写的绝对 `stateFile`，不要放宽服务端私钥权限。
+原生路线默认示例 runtime 为 `.runtime/native`；Unix 上改为真实绝对路径，例如 `/Users/alice/demo/.runtime/native/client/trust.json`。配置不会展开 `~`、`$HOME` 或 `%USERPROFILE%`。跨设备使用服务端通过可信通道提供的 `client/` 信任目录，自动模式选择客户端当前可用的 LAN 接口。默认状态文件写在 trustFile 同目录；若信任文件放在只读目录，显式配置可写的绝对 `stateFile`，不要放宽服务端私钥权限。
+
+`interfaceMode: auto` 会在网络改变后重新发现，服务仍由用户确认接入。已有配置只写 `interfaceAddress` 时继续按固定地址工作；需要漫游时显式增加 `interfaceMode: auto`，旧地址不再用于选网卡。需要固定接口时使用 `interfaceMode: pinned` 与客户端自己的 `interfaceAddress`。可选 `preferredInterfaceName` 优先使用某张网卡，但网卡不可用时仍允许回退。网络切换不会自动授权新服务、切换已有会话模型或重放中断请求；凭据继续按服务身份隔离。
 
 `demoMode: true` 仅用于本 Demo：开启固定的只读 marker 工具和 Mock 请求上下文标记。插件独立安装时默认关闭，读取通用实验能力接口 `/_llm/capabilities`。能力接口与发现协议的关系见独立插件仓库的 `docs/service-contract.md`。
 

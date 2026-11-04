@@ -3,9 +3,9 @@
     {
       "repository": "llm-discovery-core",
       "name": "@llm-discovery/discovery-core",
-      "file": "llm-discovery-discovery-core-0.3.1.tgz",
-      "sha256": "826340d0629cd8e45319198a44ef1c4a81e1b8bf3742b5920cbb9e4b1438161c",
-      "version": "0.3.1"
+      "file": "llm-discovery-discovery-core-0.4.0-roaming.1.tgz",
+      "sha256": "d90da1e13791d3def0aabcf8365e4e5ccb2594a4ade35f8f3089ec5ac8b67c37",
+      "version": "0.4.0-roaming.1"
     },
     {
       "repository": "llm-api-advertiser",
@@ -17,9 +17,9 @@
     {
       "repository": "dsh-lan-discovery",
       "name": "dsh-lan-discovery",
-      "file": "dsh-lan-discovery-0.5.2.tgz",
-      "sha256": "c76e1a7d5071581a239bf838b3a89561febe5d99139e199e32d3e5cf5cdbbc8c",
-      "version": "0.5.2"
+      "file": "dsh-lan-discovery-0.6.0-roaming.1.tgz",
+      "sha256": "078e0a38a5dbb47f3c4cb40ea07faef9530121f075b521509a0197271153b4a1",
+      "version": "0.6.0-roaming.1"
     }
   ],
   "schema": "llm-discovery-component-manifest/v1"

@@ -3,7 +3,8 @@ import { randomBytes, createHash } from 'node:crypto';
 import { mkdir, writeFile, access, readFile, rename, readdir, lstat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { isIP } from 'node:net';
-import { defaultServicesForNode, defaultNodeLabel } from '../mock-api/index.mjs';
+import { defaultNodeLabel } from '../mock-api/index.mjs';
+import { servicesForScene, validateScene } from './scene-profile.mjs';
 
 export const DEMO_AUTH = Object.freeze({ 'a-text': 'none', 'a-vision': 'required', 'b-tools': 'required', 'c-basic': 'none' });
 export const DEMO_SERVICE_IDS = Object.freeze(['a-text', 'a-vision', 'b-tools']);
@@ -103,7 +104,8 @@ function certificate(keys, subject, issuer, issuerKey, extensions) {
   return cert;
 }
 
-export async function initializeLab({ address, interfaceAddress, runtimeDir = '.runtime/current' }) {
+export async function initializeLab({ address, interfaceAddress, runtimeDir = '.runtime/current', scene }) {
+  validateScene(scene);
   if (isIP(address) !== 4 || /^(127\.|0\.|22[4-9]\.|23\d\.)/.test(address)) throw new Error('Use an explicit non-loopback IPv4 address reachable from the discovery client');
   if (interfaceAddress && isIP(interfaceAddress) !== 4) throw new Error('Invalid client discovery interface IPv4 address');
   const directory = path.resolve(runtimeDir);
@@ -115,6 +117,7 @@ export async function initializeLab({ address, interfaceAddress, runtimeDir = '.
     const existing = JSON.parse(await readFile(configFile, 'utf8'));
     if (existing.schema !== 'llm-discovery-demo-lab/v1' || !Array.isArray(existing.nodes)) throw new Error('Existing runtime has an unsupported lab manifest; no files were changed.');
     if (existing.address !== address || existing.interfaceAddress !== (interfaceAddress ?? null)) throw new Error('Existing runtime uses different addresses. Choose a new --runtime directory; do not replace active routes.');
+    if (scene !== undefined && existing.scene !== scene) throw new Error('Existing runtime uses a different scene. Choose a new --runtime directory; credentials and certificates are never replaced.');
     for (const file of ['server/lab.json', 'server/server.pem', 'server/server-key.pem', 'server/tokens.json', 'client/trust.json', 'client/ca.pem', 'client/marker.txt']) {
       const info = await lstat(path.join(directory, file)).catch(() => null);
       if (!info?.isFile() || info.isSymbolicLink()) throw new Error('Existing runtime is incomplete or contains redirected files. Preserve it and choose a new --runtime directory.');
@@ -135,7 +138,8 @@ export async function initializeLab({ address, interfaceAddress, runtimeDir = '.
     const hostname = `llm-${runId}-${id.toLowerCase()}.local`;
     return {
       id, port, label: defaultNodeLabel(id, { address, hostname }), hostname,
-      services: defaultServicesForNode(id).map(service => ({ id: service.id, auth: service.auth, label: service.label, basePath: service.base, model: service.model, display_name: service.display_name, deployment: service.deployment })),
+      services: servicesForScene(id, scene).map(service => ({ id: service.id, auth: service.auth, label: service.label, basePath: service.base, model: service.model, display_name: service.display_name, deployment: service.deployment,
+        ...(scene === undefined ? {} : { enabled: service.enabled, ready: service.ready }) })),
     };
   });
   const caKeys = forge.pki.rsa.generateKeyPair(2048);
@@ -167,7 +171,7 @@ export async function initializeLab({ address, interfaceAddress, runtimeDir = '.
   await writeFile(path.join(directory, 'client', 'ca.pem'), caPem);
   await writeFile(path.join(directory, 'client', 'marker.txt'), `demo-marker-${randomBytes(24).toString('hex')}`, { mode: 0o600 });
   await writeFile(path.join(directory, 'client', 'trust.json'), JSON.stringify({ schema: 'llm-discovery-demo-trust/v1', caFile: 'ca.pem', markerFile: 'marker.txt', services: trusted }, null, 2));
-  const config = { schema: 'llm-discovery-demo-lab/v1', runId, address, interfaceAddress: interfaceAddress ?? null, nodes };
+  const config = { schema: 'llm-discovery-demo-lab/v1', runId, address, interfaceAddress: interfaceAddress ?? null, ...(scene === undefined ? {} : { scene }), nodes };
   await writeFile(configFile, JSON.stringify(config, null, 2));
   // Server-only mount never includes the client marker or client plugin state.
   await writeFile(path.join(directory, 'server', 'lab.json'), JSON.stringify(config, null, 2));

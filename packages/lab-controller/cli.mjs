@@ -7,13 +7,14 @@ import { localIPv4, selectNativeNetwork, startNativeLab } from './native.mjs';
 import { nativeStatus, nativeStop } from './native-control.mjs';
 
 const usage = `Usage: node packages/lab-controller/cli.mjs <command> [options]
-  native run|start [--runtime DIR] [--interface IPv4] [--address IPv4]
+  native run|start [--runtime DIR] [--interface IPv4] [--address IPv4] [--scene company|home]
       Run two native Node processes in the foreground. Ctrl+C stops both.
       Select a local IPv4 interface; multiple interfaces require --interface.
       --address is the local advertised HTTPS address (default: --interface).
+      --scene chooses presentation and initial services for a new runtime only.
   native status|stop [--runtime DIR]
       Inspect or gracefully stop only this runtime's authenticated controller.
-  init --address <service-ip> [--interface <client-interface-ip>] [--runtime DIR]
+  init --address <service-ip> [--interface <client-interface-ip>] [--runtime DIR] [--scene company|home]
   migrate-auth-demo|migrate-three-state-demo [--runtime DIR]
   doctor
       Show this computer's usable IPv4 interfaces and Node version.
@@ -44,12 +45,12 @@ async function main() {
   if (command === 'native') {
     const [action, ...nativeArgs] = args;
     if (!['run', 'start', 'status', 'stop'].includes(action)) throw new Error('Use native run, native status, or native stop. Run --help for usage.');
-    const options = parseOptions(nativeArgs, ['run', 'start'].includes(action) ? ['--runtime', '--interface', '--address'] : ['--runtime']);
+    const options = parseOptions(nativeArgs, ['run', 'start'].includes(action) ? ['--runtime', '--interface', '--address', '--scene'] : ['--runtime']);
     const runtimeDir = options.runtime ?? '.runtime/current';
     if (action === 'status') { print(await nativeStatus(runtimeDir)); return; }
     if (action === 'stop') { print(await nativeStop(runtimeDir)); return; }
     if (Number(process.versions.node.split('.')[0]) < 24) throw new Error('Native Demo mode requires Node.js 24 or later.');
-    const controller = await startNativeLab({ runtimeDir, interfaceAddress: options.interface, address: options.address });
+    const controller = await startNativeLab({ runtimeDir, interfaceAddress: options.interface, address: options.address, scene: options.scene });
     if (controller.status().state === 'running') print(controller.status());
     const result = await controller.closed;
     if (result.error) throw result.error;
@@ -61,8 +62,8 @@ async function main() {
     parseOptions(args, []);
     print(localIPv4());
   } else if (command === 'init') {
-    const options = parseOptions(args, ['--address', '--interface', '--runtime']);
-    print(await initializeLab({ address: options.address, interfaceAddress: options.interface, runtimeDir: options.runtime }));
+    const options = parseOptions(args, ['--address', '--interface', '--runtime', '--scene']);
+    print(await initializeLab({ address: options.address, interfaceAddress: options.interface, runtimeDir: options.runtime, scene: options.scene }));
   } else if (['migrate-auth-demo', 'migrate-three-state-demo'].includes(command)) {
     const options = parseOptions(args, ['--runtime']);
     print(await (command === 'migrate-auth-demo' ? migrateAuthDemo : migrateThreeStateDemo)({ runtimeDir: options.runtime }));

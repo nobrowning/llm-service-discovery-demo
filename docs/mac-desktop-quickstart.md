@@ -1,10 +1,10 @@
 # macOS：原生 Demo 与 Harness Desktop
 
-本指南使用 Demo **0.6.2** 的 native ZIP、随附插件 **0.5.2**，以及已核对 Host 接口的 Harness Desktop **0.2.1-rc.5**。插件也声明兼容 rc.3；其他 Host 版本应重新检查接口。安装包检查、网络检查和真实桌面会话分别记录，已执行范围以[验证报告](validation-report.md)为准，本指南本身不代表所有界面步骤已经验收。
+本指南使用 Demo **0.7.0-roaming.1** 的 native ZIP、随附插件 **0.6.0-roaming.1**，以及已核对 Host 接口的 Harness Desktop **0.2.1-rc.5**。插件也声明兼容 rc.3；其他 Host 版本应重新检查接口。安装包检查、网络检查和真实桌面会话分别记录，已执行范围以[验证报告](validation-report.md)为准，本指南本身不代表所有界面步骤已经验收。
 
 ## 准备原生服务
 
-从 [Demo Release](https://github.com/nobrowning/llm-service-discovery-demo/releases/tag/v0.6.2) 下载 `llm-service-discovery-demo-0.6.2-native.zip`，使用 `shasum -a 256 文件.zip` 与同页 `SHA256SUMS` 核对后解压。准备适合本机 Apple Silicon 或 Intel 的 Node.js 24+；Harness 自带的 CLI 运行时不会自动把终端的 `node` 命令装好。也可将官方 Node 归档解压到用户目录，临时把其 `bin` 加入当前终端的 `PATH`。
+从 [Demo Release](https://github.com/nobrowning/llm-service-discovery-demo/releases/tag/v0.7.0-roaming.1) 下载 `llm-service-discovery-demo-0.7.0-roaming.1-native.zip`，使用 `shasum -a 256 文件.zip` 与同页 `SHA256SUMS` 核对后解压。准备适合本机 Apple Silicon 或 Intel 的 Node.js 24+；Harness 自带的 CLI 运行时不会自动把终端的 `node` 命令装好。也可将官方 Node 归档解压到用户目录，临时把其 `bin` 加入当前终端的 `PATH`。
 
 在解压目录执行：
 
@@ -41,7 +41,7 @@ node scripts/verify-live.mjs --runtime .runtime/native
 ```sh
 DSH='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh'
 "$DSH" --version
-"$DSH" plugin --profile desktop add "$PWD/vendor/dsh-lan-discovery-0.5.2.tgz" --ignore-scripts
+"$DSH" plugin --profile desktop add "$PWD/vendor/dsh-lan-discovery-0.6.0-roaming.1.tgz" --ignore-scripts
 ```
 
 不要用另外安装的全局 CLI 修改 Desktop profile。rc.5 的共享路径契约默认使用 `~/.dsh`；显式配置或 `DSH_HOME` 可覆盖它。下面的 `profiles/desktop/cordis.patch.yml` 必须位于**这次 Desktop 实际使用的 Harness home**。不要为安装命令临时设置另一个 `DSH_HOME`，否则 GUI 与 CLI 可能操作不同 profile。
@@ -53,13 +53,13 @@ DSH='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh'
   name: dsh-lan-discovery
   config:
     trustFile: '/Users/alice/demo/.runtime/native/client/trust.json'
-    interfaceAddress: '192.168.1.10'
+    interfaceMode: 'auto'
     networkId: 'ietf-demo'
     autoStart: true
     demoMode: true
 ```
 
-把路径改为自己的真实绝对路径。可在 Demo 目录运行 `pwd -P` 获取目录前缀；YAML 配置不展开 `~` 或 `$HOME`。`interfaceAddress` 始终是**运行 Harness 的 Mac 自己**的 IPv4。若服务运行在另一台机器，经可信通道取得其 `client/` 信任目录，并使用 Mac 本地保存的绝对路径；普通客户端不需要服务端私钥目录。默认状态文件写在 trust 文件旁，若该目录只读，再显式指定可写的绝对 `stateFile`。
+把路径改为自己的真实绝对路径。可在 Demo 目录运行 `pwd -P` 获取目录前缀；YAML 配置不展开 `~` 或 `$HOME`。`interfaceMode: auto` 跟随 Mac 当前可用 LAN 网络；旧配置只写 `interfaceAddress` 时保持固定模式，需显式增加该行才启用漫游。需要固定网卡时选 `pinned` 并填写 Mac 自己的 IPv4。若服务运行在另一台机器，经可信通道取得其 `client/` 信任目录，并使用 Mac 本地保存的绝对路径；普通客户端不需要服务端私钥目录。默认状态文件写在 trust 文件旁，若该目录只读，再显式指定可写的绝对 `stateFile`。
 
 重新打开 Harness，确认“局域网服务 / LAN services”出现在侧栏并能列出三项服务。若没有侧栏，先检查所用 Host 版本、实际 profile、插件安装是否成功和启动错误，不通过重复追加配置解决。
 

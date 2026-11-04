@@ -8,12 +8,12 @@ Two nodes publish their own mDNS/DNS-SD announcements for three Mock services: D
 
 ## Download and run
 
-Choose an asset from [GitHub Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/latest) and compare its SHA-256 with the same release's `SHA256SUMS`.
+Choose an asset from [GitHub Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/tag/v0.7.0-roaming.1) and compare its SHA-256 with the same release's `SHA256SUMS`.
 
 | Deployment | Asset | Prerequisites |
 |---|---|---|
-| Native processes on macOS, Linux or Windows | `llm-service-discovery-demo-0.6.2-native.zip` | Node.js 24+ for your OS/architecture |
-| Two Linux containers, Windows client | `llm-service-discovery-demo-0.6.2-windows-x64-wsl.zip` | Windows x64, Node.js 24+, existing x64 Ubuntu WSL |
+| Native processes on macOS, Linux or Windows | `llm-service-discovery-demo-0.7.0-roaming.1-native.zip` | Node.js 24+ for your OS/architecture |
+| Two Linux containers, Windows client | `llm-service-discovery-demo-0.7.0-roaming.1-windows-x64-wsl.zip` | Windows x64, Node.js 24+, existing x64 Ubuntu WSL |
 
 Both contain JavaScript dependencies and the plugin tgz. Only the WSL ZIP contains the prebuilt linux/amd64 image. Node.js and Harness are installed separately. GitHub's automatic **Source code** archives require `npm ci --ignore-scripts` first.
 
@@ -46,7 +46,7 @@ The launcher verifies/imports the bundled image into the project daemon. First-t
 
 ## Harness client
 
-Install `vendor/dsh-lan-discovery-0.5.2.tgz` using the CLI belonging to your Harness installation, then set the trust file and the **client's** local network interface. See [plugin setup](docs/plugin-setup.md). Host compatibility is pinned to **0.2.1-rc.3 / rc.5**. Windows/macOS Desktop, Linux Web Host evaluation, and standalone service execution have separate acceptance requirements.
+Install `vendor/dsh-lan-discovery-0.6.0-roaming.1.tgz` using the CLI belonging to your Harness installation, then set the trust file and `interfaceMode: auto` to follow the client's current LAN. See [plugin setup](docs/plugin-setup.md). Host compatibility is pinned to **0.2.1-rc.3 / rc.5**. Windows/macOS Desktop, Linux Web Host evaluation, and standalone service execution have separate acceptance requirements.
 
 Open **LAN services / 局域网服务**. Select a row to reveal inspection, connection and API key controls. Selection does not connect automatically; collapse/switch clears unsent passwords. English/Chinese follows Harness's locale preference. Discovery alone never authorizes sending credentials.
 
@@ -72,3 +72,9 @@ CI checks Windows x64, Linux x64/arm64 and macOS x64/arm64 with Node 24. Pure Ja
 - [Mock API contract](packages/mock-api/README.md)
 
 Core, advertiser and plugin have their own repositories. Versioned tgz files in `vendor/` let this repository install independently. All four projects use [MIT](LICENSE); npm and image-registry distributions are not published. Keep runtime directories, certificates, keys and user profiles out of shared archives.
+
+## Company-to-home candidate
+
+This prerelease bundles automatic network rediscovery. New runtimes accept `--scene company` or `--scene home`; see [model presentation](docs/model-presentation.md). The company scene presents DeepSeek-R1-Distill-Qwen-32B (Q4_K_M), Qwen2.5-VL-7B-Instruct (BF16), and GLM-4-9B-Chat (INT4); home presents Qwen3-8B (Q8_0). These are simulated deployment labels, not running model weights. Existing runtime keys and certificates are retained; choose a new runtime directory for a different scene. [Validation scope](docs/validation-report.md) distinguishes controlled Web Host evidence from physical-interface core/TLS checks.
+
+[Company-to-home verification](docs/company-home-validation.md) records the controlled UI and physical interface checks separately.

@@ -88,11 +88,11 @@ function ownChild(nodeId, options, { forkNode, startupTimeoutMs, onUnexpectedExi
   };
 }
 
-export async function startNativeLab({ runtimeDir = '.runtime/current', interfaceAddress, address } = {}, {
+export async function startNativeLab({ runtimeDir = '.runtime/current', interfaceAddress, address, scene } = {}, {
   forkNode = fork, networkInterfaces = os.networkInterfaces(), startupTimeoutMs = 30000, handleSignals = true,
 } = {}) {
   const network = selectNativeNetwork({ interfaceAddress, address }, networkInterfaces);
-  const initialized = await initializeLab({ ...network, runtimeDir });
+  const initialized = await initializeLab({ ...network, runtimeDir, scene });
   if (initialized.authMigrationRequired || initialized.topologyMigrationRequired) throw new Error('This runtime requires an explicit Demo migration before native startup.');
   runtimeDir = await realpath(path.resolve(runtimeDir));
   const lab = JSON.parse(await readFile(path.join(runtimeDir, 'lab.json'), 'utf8'));
@@ -104,7 +104,8 @@ export async function startNativeLab({ runtimeDir = '.runtime/current', interfac
   let state = 'starting', control, stopping, failure, resolveClosed;
   const closed = new Promise(resolve => { resolveClosed = resolve; });
   const status = () => ({ backend: 'native', state, instanceId, runId: lab.runId, runtimeDir, ...network,
-    trustFile: path.join(runtimeDir, 'client/trust.json'), nodes: children.map(child => child.status()), services: lab.nodes.flatMap(node => node.services.map(service => service.id)) });
+    trustFile: path.join(runtimeDir, 'client/trust.json'), ...(lab.scene ? { scene: lab.scene } : {}), nodes: children.map(child => child.status()),
+    services: lab.nodes.flatMap(node => node.services.filter(service => service.enabled !== false && service.ready !== false).map(service => service.id)) });
   async function stop() {
     stopping ??= (async () => {
       state = 'stopping';

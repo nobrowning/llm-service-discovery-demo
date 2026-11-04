@@ -12,7 +12,7 @@ A 节点上的 DeepSeek 和 Qwen-VL 共享主机与端口，但使用不同 API 
 
 ## 启动与旧环境更新
 
-新环境可按[原生部署](native-quickstart.md)运行 `native run`，或在 Windows/WSL 使用 `scripts/start-demo.ps1`。安装 `vendor/dsh-lan-discovery-0.5.2.tgz`，详见[插件安装](plugin-setup.md)。下文 `.runtime/current` 是 WSL 默认路径；原生路线改为实际选择的 runtime，例如 `.runtime/native`。macOS/Linux 直接在本机文本编辑器查看 presenter 文件，不需要 PowerShell 辅助脚本。
+新环境可按[原生部署](native-quickstart.md)运行 `native run`，或在 Windows/WSL 使用 `scripts/start-demo.ps1`。安装 `vendor/dsh-lan-discovery-0.6.0-roaming.1.tgz`，详见[插件安装](plugin-setup.md)。下文 `.runtime/current` 是 WSL 默认路径；原生路线改为实际选择的 runtime，例如 `.runtime/native`。macOS/Linux 直接在本机文本编辑器查看 presenter 文件，不需要 PowerShell 辅助脚本。
 
 如果此前运行过四服务版本，先断开 LAN 连接并完全退出 Harness，停止该 runtime 的服务后再迁移。Windows/WSL 默认 runtime 执行：
 

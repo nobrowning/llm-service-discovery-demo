@@ -4,7 +4,7 @@
 
 ## 下载与校验
 
-从 [Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/latest) 下载 `llm-service-discovery-demo-0.6.2-native.zip` 和同页 `SHA256SUMS`。先核对 ZIP 的 SHA-256：macOS 使用 `shasum -a 256 文件.zip`，Linux 使用 `sha256sum 文件.zip`，Windows PowerShell 使用 `Get-FileHash 文件.zip -Algorithm SHA256`。核对值来自同次 Release。
+从 [Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/tag/v0.7.0-roaming.1) 下载 `llm-service-discovery-demo-0.7.0-roaming.1-native.zip` 和同页 `SHA256SUMS`。先核对 ZIP 的 SHA-256：macOS 使用 `shasum -a 256 文件.zip`，Linux 使用 `sha256sum 文件.zip`，Windows PowerShell 使用 `Get-FileHash 文件.zip -Algorithm SHA256`。核对值来自同次 Release。
 
 解压后进入目录。ZIP 已含 JavaScript 依赖和组件 tgz，不包含 Node.js、Harness 或运行凭据。GitHub 自动生成的 Source code 包则需要先执行 `npm ci --ignore-scripts`；源码没有发行清单，跳过下方的 `verify-release-files.mjs`（该命令仅用于部署 ZIP），其他指令相同。
 
