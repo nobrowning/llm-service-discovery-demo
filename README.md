@@ -1,5 +1,9 @@
 # LAN LLM API discovery demo
 
+[Project website](https://nobrowning.github.io/llm-service-discovery-demo/)
+
+[Bilingual website source and GitHub Pages deployment](docs/website.md)
+
 [中文说明](README.zh-CN.md) · [Validation report](docs/validation-report.md) · [Protocol mapping](docs/protocol-mapping.md)
 
 Discover LAN LLM APIs inside DeepSeek Harness, inspect a service, and connect from a normal conversation. An implementation experiment for [draft-cui-dawn-local-llm-api-discovery-00](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/).

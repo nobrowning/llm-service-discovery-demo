@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title data-title-zh="局域网 LLM API 发现">Local LLM API Discovery</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Find LLM API services on any local network, the way you find a printer or a Wi-Fi network. Services announce themselves with mDNS/DNS-SD; you choose what to connect.">
+<meta property="og:title" content="Local LLM API Discovery">
+<meta property="og:description" content="Join a network. See which LLM APIs are there. An open implementation of LLM API discovery with mDNS/DNS-SD.">
+<meta property="og:type" content="website">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/site.css">
+<script>
+(function () {
+  var l = 'en';
+  try {
+    var q = new URLSearchParams(location.search).get('lang');
+    if (q === 'zh' || q === 'en') l = q;
+    else { var s = localStorage.getItem('llmd-lang'); if (s === 'zh' || s === 'en') l = s; }
+  } catch (e) {}
+  document.documentElement.setAttribute('data-lang', l);
+  document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en';
+})();
+</script>
+</head>
+<body>
+<a class="skip" href="#main"><span data-l="en">Skip to content</span><span data-l="zh" lang="zh-CN">跳到正文</span></a>
+
+<header class="site-header">
+  <div class="wrap header-row">
+    <a class="brand" href="./" aria-label="Local LLM API Discovery">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.2"/><path d="M9 13.5a9.5 9.5 0 0 1 9.5 9.5" /><path d="M9 6a17 17 0 0 1 17 17"/></svg>
+      <span class="brand-name"><span data-l="en">Local LLM API Discovery</span><span data-l="zh" lang="zh-CN">局域网 LLM API 发现</span></span>
+    </a>
+    <nav class="nav" id="site-nav" aria-label="Main">
+      <a href="#why"><span data-l="en">Why</span><span data-l="zh" lang="zh-CN">为什么需要</span></a>
+      <a href="#scenarios"><span data-l="en">Scenarios</span><span data-l="zh" lang="zh-CN">场景</span></a>
+      <a href="#how"><span data-l="en">How it works</span><span data-l="zh" lang="zh-CN">工作原理</span></a>
+      <a href="technical.html"><span data-l="en">Technical details</span><span data-l="zh" lang="zh-CN">技术细节</span></a>
+      <a href="https://github.com/nobrowning/llm-service-discovery-demo">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <div class="lang" role="group" aria-label="Language / 语言">
+        <button type="button" data-set-lang="en" aria-pressed="true">EN</button>
+        <button type="button" data-set-lang="zh" aria-pressed="false" lang="zh-CN">中文</button>
+      </div>
+      <button type="button" class="menu-btn" aria-controls="site-nav" aria-expanded="false"><span data-l="en">Menu</span><span data-l="zh" lang="zh-CN">菜单</span></button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- Hero: the thesis, with a live service list that follows the network -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow"><span data-l="en">Open protocol experiment · mDNS / DNS-SD</span><span data-l="zh" lang="zh-CN">开放协议实验 · mDNS / DNS-SD</span></p>
+      <h1>
+        <span data-l="en">Join a network. See which LLM APIs are there.</span>
+        <span data-l="zh" lang="zh-CN">接入一个网络，<br>就能看到这里有哪些 LLM API。</span>
+      </h1>
+      <p class="lead" data-l="en">Model servers on the local network announce themselves. Your AI app lists what is available here, like a Wi-Fi list or the printers in a print dialog, and you choose which one to use. Move to another network and the list updates. No IP addresses to type.</p>
+      <p class="lead" data-l="zh" lang="zh-CN">局域网里的模型服务会主动公告自己。你的 AI 应用把当前网络里可用的服务列出来，就像 Wi-Fi 列表，或打印对话框里的打印机列表，由你选择用哪一个。换到另一个网络，列表随之更新，不用再手动填写 IP 地址。</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/nobrowning/llm-service-discovery-demo"><span data-l="en">Explore on GitHub ↗</span><span data-l="zh" lang="zh-CN">在 GitHub 查看项目 ↗</span></a>
+        <a class="btn" href="https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/"><span data-l="en">Read the IETF draft ↗</span><span data-l="zh" lang="zh-CN">阅读 IETF 草案 ↗</span></a>
+      </div>
+    </div>
+
+    <div class="hero-demo">
+      <div class="ripple" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="picker" id="picker">
+        <div class="net-switch" role="group" aria-labelledby="net-switch-label">
+          <span class="net-switch-label" id="net-switch-label"><span data-l="en">Your laptop joins</span><span data-l="zh" lang="zh-CN">笔记本接入</span></span>
+          <div class="net-buttons">
+            <button type="button" data-net="office" aria-pressed="true"><span data-l="en">Office</span><span data-l="zh" lang="zh-CN">公司</span></button>
+            <button type="button" data-net="home" aria-pressed="false"><span data-l="en">Home</span><span data-l="zh" lang="zh-CN">家</span></button>
+            <button type="button" data-net="lab" aria-pressed="false"><span data-l="en">Lab</span><span data-l="zh" lang="zh-CN">实验室</span></button>
+            <button type="button" data-net="none" aria-pressed="false"><span data-l="en">No network</span><span data-l="zh" lang="zh-CN">无网络</span></button>
+          </div>
+        </div>
+        <div class="picker-head">
+          <div>
+            <p class="picker-title"><span data-l="en">LLM services on this network</span><span data-l="zh" lang="zh-CN">当前网络中的 LLM 服务</span></p>
+            <p class="picker-sub" id="picker-count"></p>
+          </div>
+          <span class="status" id="picker-status"></span>
+        </div>
+        <ul class="svc-list" id="svc-list" aria-live="polite"></ul>
+        <p class="picker-foot"><span data-l="en">Selecting a service does not connect it. You confirm first.</span><span data-l="zh" lang="zh-CN">选中服务不会自动连接，由你确认后再接入。</span></p>
+      </div>
+      <p class="fig-note"><span data-l="en">Illustration. Service names are examples.</span><span data-l="zh" lang="zh-CN">示意图，服务名称仅为示例。</span></p>
+    </div>
+  </div>
+</section>
+
+<!-- Problem -->
+<section class="band" id="why">
+  <div class="wrap">
+    <p class="eyebrow"><span data-l="en">The problem</span><span data-l="zh" lang="zh-CN">现状</span></p>
+    <h2><span data-l="en">Using a local model usually starts with a pasted address.</span><span data-l="zh" lang="zh-CN">用一个本地模型，往往从复制粘贴地址开始。</span></h2>
+    <div class="split">
+      <div class="story" aria-label="Example">
+        <div class="msg">
+          <p class="msg-from"><span data-l="en">Team chat</span><span data-l="zh" lang="zh-CN">团队群聊</span></p>
+          <p data-l="en">The model server is up: <code>http://192.168.31.47:8000/v1</code>, model <code>qwen2.5-72b</code>. I'll send you the key.</p>
+          <p data-l="zh" lang="zh-CN">模型服务起好了：<code>http://192.168.31.47:8000/v1</code>，模型 <code>qwen2.5-72b</code>，key 私聊发你。</p>
+        </div>
+        <div class="file">
+          <p class="file-name">config.yaml</p>
+<pre><code>base_url: http://192.168.31.47:8000/v1
+model:    qwen2.5-72b
+api_key:  sk-••••••••••••</code></pre>
+        </div>
+        <div class="err">
+          <p class="err-when"><span data-l="en">Next day, on another network</span><span data-l="zh" lang="zh-CN">第二天，换了一个网络</span></p>
+          <p class="err-line"><code>connect ETIMEDOUT 192.168.31.47:8000</code></p>
+        </div>
+      </div>
+      <div class="pains">
+        <ul class="xlist">
+          <li><span data-l="en">Someone has to send the address, port, path and model name by hand.</span><span data-l="zh" lang="zh-CN">地址、端口、路径和模型名，都要有人手动发给你。</span></li>
+          <li><span data-l="en">Every app on every device is set up separately.</span><span data-l="zh" lang="zh-CN">每台设备上的每个应用，都要单独配置一遍。</span></li>
+          <li><span data-l="en">When the server's address changes, every copy of the setting breaks.</span><span data-l="zh" lang="zh-CN">服务器地址一变，所有配置都要跟着改。</span></li>
+          <li><span data-l="en">When you move to another network, your apps still point at a server you can no longer reach.</span><span data-l="zh" lang="zh-CN">换了网络，应用仍然指向一台已经连不上的服务器。</span></li>
+          <li><span data-l="en">It is hard to see what is available right now: a model that was just deployed, or one that went offline.</span><span data-l="zh" lang="zh-CN">很难知道此刻有哪些服务可用：刚上线的模型，或已经下线的服务。</span></li>
+        </ul>
+        <blockquote class="quote">
+          <p data-l="en">“When an application joins a different network or a service address changes, these settings may need to be updated even when a suitable local service is already available.”</p>
+          <p data-l="zh" lang="zh-CN">“当应用接入另一个网络，或服务地址发生变化时，即使本地已有合适的服务，这些设置也可能需要更新。”</p>
+          <footer><a href="https://datatracker.ietf.org/doc/html/draft-cui-dawn-local-llm-api-discovery-00"><span data-l="en">IETF draft, abstract</span><span data-l="zh" lang="zh-CN">IETF 草案摘要（译文）</span></a></footer>
+        </blockquote>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Familiar pattern -->
+<section class="section">
+  <div class="wrap">
+    <p class="eyebrow"><span data-l="en">A familiar pattern</span><span data-l="zh" lang="zh-CN">熟悉的用法</span></p>
+    <h2><span data-l="en">Printers and Wi-Fi already work this way.</span><span data-l="zh" lang="zh-CN">打印机和 Wi-Fi 早就是这样用的。</span></h2>
+    <p class="section-lead" data-l="en">You don't type a printer's IP address. You open the print dialog and pick one of the printers on this network. You don't set up a Wi-Fi network in advance. You look at the list and join one. LLM APIs can work the same way.</p>
+    <p class="section-lead" data-l="zh" lang="zh-CN">打印时你不用输入打印机的 IP，而是在打印对话框里，从当前网络的打印机中选一台。连 Wi-Fi 也不用提前配置，看一眼列表就能加入。LLM API 也可以这样用。</p>
+    <div class="pattern">
+      <div class="pattern-item">
+        <svg class="pic" viewBox="0 0 48 48" aria-hidden="true"><path d="M8 19a23 23 0 0 1 32 0"/><path d="M14 25.5a14.5 14.5 0 0 1 20 0"/><path d="M19.5 31.5a6.5 6.5 0 0 1 9 0"/><circle cx="24" cy="37" r="2.2" class="fill"/></svg>
+        <h3>Wi-Fi</h3>
+        <p><span data-l="en">See nearby networks, then join one.</span><span data-l="zh" lang="zh-CN">先看附近的网络，再选择加入。</span></p>
+      </div>
+      <div class="pattern-item">
+        <svg class="pic" viewBox="0 0 48 48" aria-hidden="true"><rect x="13" y="7" width="22" height="10" rx="1.5"/><rect x="7" y="17" width="34" height="16" rx="3"/><rect x="13" y="28" width="22" height="13" rx="1.5"/><circle cx="35" cy="23" r="1.6" class="fill"/></svg>
+        <h3><span data-l="en">Printers</span><span data-l="zh" lang="zh-CN">打印机</span></h3>
+        <p><span data-l="en">See the printers on this network, then print.</span><span data-l="zh" lang="zh-CN">先看当前网络的打印机，再打印。</span></p>
+      </div>
+      <div class="pattern-item is-new">
+        <svg class="pic" viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="9" width="30" height="12" rx="3"/><rect x="9" y="27" width="30" height="12" rx="3"/><circle cx="15" cy="15" r="1.6" class="fill"/><circle cx="15" cy="33" r="1.6" class="fill"/><path d="M21 15h12M21 33h12"/></svg>
+        <h3>LLM API</h3>
+        <p><span data-l="en">See the LLM APIs on this network, then check one and connect.</span><span data-l="zh" lang="zh-CN">先看当前网络的 LLM API，再检查并接入。</span></p>
+      </div>
+    </div>
+    <p class="note" data-l="en">Network printers are commonly found with mDNS and DNS-SD. This project uses the same standard protocols and adds one service type for LLM APIs: <code>_llm-api._tcp</code>.</p>
+    <p class="note" data-l="zh" lang="zh-CN">网络打印机通常就是通过 mDNS 和 DNS-SD 被发现的。本项目使用同样的标准协议，只为 LLM API 增加一个服务类型：<code>_llm-api._tcp</code>。</p>
+  </div>
+</section>
+
+<!-- Why now: agents are harnesses on top of an API -->
+<section class="band">
+  <div class="wrap">
+    <p class="eyebrow"><span data-l="en">Why it works, and why now</span><span data-l="zh" lang="zh-CN">为什么可行，为什么是现在</span></p>
+    <h2><span data-l="en">AI apps already run on an API. The server behind it can change.</span><span data-l="zh" lang="zh-CN">AI 应用本来就运行在 API 之上，背后的服务器可以更换。</span></h2>
+    <div class="split split-even">
+      <div>
+        <p class="body-lg" data-l="en">A coding agent, a chat app or an IDE assistant is a front end, often called a harness. It does its work by sending requests to an LLM API server, and the model runs behind that API. Point the harness at a different server and the same app runs on a different model.</p>
+        <p class="body-lg" data-l="zh" lang="zh-CN">编程 agent、聊天应用、IDE 助手，本质上都是一个前端 harness。它通过向 LLM API server 发送请求来工作，模型运行在 API 后面。把 harness 指向另一个 server，同一个应用就换成了另一个模型。</p>
+        <p class="body-lg" data-l="en">So switching models is already possible. What is missing is a simple way for the app to find the servers that are on the network it has just joined.</p>
+        <p class="body-lg" data-l="zh" lang="zh-CN">所以换用模型本身已经可行。缺的是一个简单的方法，让应用找到它刚接入的网络里有哪些 server。</p>
+      </div>
+      <figure class="arch" aria-label="An AI app sends API requests to one of several LLM API servers">
+        <div class="arch-app">
+          <p class="arch-title"><span data-l="en">AI app</span><span data-l="zh" lang="zh-CN">AI 应用</span></p>
+          <p class="arch-sub"><span data-l="en">Coding agent · chat app · IDE assistant</span><span data-l="zh" lang="zh-CN">编程 agent · 聊天应用 · IDE 助手</span></p>
+          <p class="arch-tag">harness</p>
+        </div>
+        <div class="arch-link"><span>LLM API · HTTPS</span></div>
+        <div class="arch-servers">
+          <div class="arch-local">
+            <p class="arch-local-label"><span data-l="en">Found on the local network</span><span data-l="zh" lang="zh-CN">在局域网中发现</span></p>
+            <p class="srv"><span data-l="en">Office workstation</span><span data-l="zh" lang="zh-CN">公司工作站</span></p>
+            <p class="srv"><span data-l="en">Home PC</span><span data-l="zh" lang="zh-CN">家里的电脑</span></p>
+            <p class="srv"><span data-l="en">Lab GPU server</span><span data-l="zh" lang="zh-CN">实验室 GPU 服务器</span></p>
+          </div>
+          <p class="srv srv-cloud"><span data-l="en">Cloud provider</span><span data-l="zh" lang="zh-CN">云服务商</span></p>
+        </div>
+      </figure>
+    </div>
+    <div class="reasons">
+      <div class="reason">
+        <h3><span data-l="en">Local models are practical</span><span data-l="zh" lang="zh-CN">本地模型已经实用</span></h3>
+        <p><span data-l="en">Open-weight models such as DeepSeek, Qwen and GLM run on a single workstation. Teams can keep prompts and data on their own machines.</span><span data-l="zh" lang="zh-CN">DeepSeek、Qwen、GLM 等开放权重模型，一台工作站就能运行。团队可以把提示词和数据留在自己的机器上。</span></p>
+      </div>
+      <div class="reason">
+        <h3><span data-l="en">One server, many clients</span><span data-l="zh" lang="zh-CN">一台服务器，很多客户端</span></h3>
+        <p><span data-l="en">One GPU machine often serves a whole team. Every laptop, agent and IDE needs its address.</span><span data-l="zh" lang="zh-CN">一台 GPU 机器常常服务整个团队，每台笔记本、每个 agent 和 IDE 都需要它的地址。</span></p>
+      </div>
+      <div class="reason">
+        <h3><span data-l="en">People and services move</span><span data-l="zh" lang="zh-CN">人和服务都在变动</span></h3>
+        <p><span data-l="en">Laptops move between networks all day. Services are redeployed, and addresses change.</span><span data-l="zh" lang="zh-CN">笔记本每天在不同网络之间切换，服务会重新部署，地址也会变化。</span></p>
+      </div>
+      <div class="reason">
+        <h3><span data-l="en">No shared way to ask</span><span data-l="zh" lang="zh-CN">缺少统一的发现方式</span></h3>
+        <p><span data-l="en">Each app has its own settings page. Scanning ports is guesswork and cannot tell what an API is or whether it needs a key.</span><span data-l="zh" lang="zh-CN">每个应用各有一套设置。扫描端口只能靠猜，也看不出是什么 API、需不需要 key。</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Scenarios -->
+<section class="section" id="scenarios">
+  <div class="wrap">
+    <p class="eyebrow"><span data-l="en">Scenarios</span><span data-l="zh" lang="zh-CN">场景</span></p>
+    <h2><span data-l="en">Useful wherever a local network has LLM services on it.</span><span data-l="zh" lang="zh-CN">只要局域网里有 LLM 服务，就能用上。</span></h2>
+
+    <article class="feature">
+      <div class="feature-text">
+        <h3><span data-l="en">Moving between networks</span><span data-l="zh" lang="zh-CN">在不同网络之间切换</span></h3>
+        <p data-l="en">Office, home, a lab, a client site, another building. Each network has its own services. When your laptop joins a network, the list shows that network's services. When it leaves, they disappear from the list. Office to home is one example; any move from one local network to another works the same way.</p>
+        <p data-l="zh" lang="zh-CN">公司、家、实验室、客户现场、另一栋楼，每个网络都有自己的服务。笔记本接入哪个网络，列表就显示哪个网络的服务；离开后，这些服务从列表中消失。从公司到家只是一个例子，从任意一个局域网切换到另一个局域网都是一样的。</p>
+        <p data-l="en">Saved keys stay where they are. Nothing connects until you choose a service.</p>
+        <p data-l="zh" lang="zh-CN">已保存的 key 不受影响。你不选择，就不会接入任何服务。</p>
+      </div>
+      <figure class="roam" id="roam" data-state="a" aria-label="Animated diagram: a laptop moves from network A to network B and its service list changes">
+        <div class="diagram-controls" role="group" aria-label="Diagram steps">
+          <button type="button" class="dc-btn" data-roam="a" aria-pressed="true"><span class="n">1</span><span data-l="en">On network A</span><span data-l="zh" lang="zh-CN">在网络 A</span></button>
+          <button type="button" class="dc-btn" data-roam="between" aria-pressed="false"><span class="n">2</span><span data-l="en">Between networks</span><span data-l="zh" lang="zh-CN">切换途中</span></button>
+          <button type="button" class="dc-btn" data-roam="b" aria-pressed="false"><span class="n">3</span><span data-l="en">On network B</span><span data-l="zh" lang="zh-CN">在网络 B</span></button>
+          <button type="button" class="dc-btn dc-play" data-roam-play aria-pressed="false"><svg viewBox="0 0 12 12" aria-hidden="true"><path class="i-play" d="M2 1l9 5-9 5z"/></svg><span class="lbl-play"><span data-l="en">Play</span><span data-l="zh" lang="zh-CN">播放</span></span><span class="lbl-pause" hidden><span data-l="en">Pause</span><span data-l="zh" lang="zh-CN">暂停</span></span></button>
+        </div>
+        <div class="roam-scene">
+          <section class="zone zone-a" aria-label="Network A">
+            <p class="zone-label"><span data-l="en">Network A</span><span data-l="zh" lang="zh-CN">网络 A</span> <small><span data-l="en">e.g. office</span><span data-l="zh" lang="zh-CN">例如公司</span></small></p>
+            <div class="servers">
+              <div class="srv-node" id="r-ws"><div class="srv-head"><span class="srv-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg></span><strong><span data-l="en">Workstation</span><span data-l="zh" lang="zh-CN">工作站</span></strong><span class="host">ws-a.local</span></div><ul class="svc-blocks" aria-label="LLM API services"><li data-svc="deepseek">DeepSeek-R1-Distill-Qwen-32B</li><li data-svc="vision">Studio Vision</li></ul></div>
+              <div class="srv-node" id="r-team"><div class="srv-head"><span class="srv-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg></span><strong><span data-l="en">Team server</span><span data-l="zh" lang="zh-CN">团队服务器</span></strong><span class="host">192.168.1.2</span></div><ul class="svc-blocks" aria-label="LLM API services"><li data-svc="glm">GLM-4-9B-Chat</li></ul></div>
+            </div>
+            <div class="slot" data-slot="a"></div>
+          </section>
+          <div class="zone-gap">
+            <div class="slot" data-slot="between"></div>
+            <p><span data-l="en">No network</span><span data-l="zh" lang="zh-CN">无网络</span></p>
+          </div>
+          <section class="zone zone-b" aria-label="Network B">
+            <p class="zone-label"><span data-l="en">Network B</span><span data-l="zh" lang="zh-CN">网络 B</span> <small><span data-l="en">e.g. home</span><span data-l="zh" lang="zh-CN">例如家</span></small></p>
+            <div class="servers">
+              <div class="srv-node" id="r-home"><div class="srv-head"><span class="srv-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg></span><strong><span data-l="en">Home PC</span><span data-l="zh" lang="zh-CN">家里的电脑</span></strong><span class="host">home-pc.local</span></div><ul class="svc-blocks" aria-label="LLM API services"><li data-svc="qwen3">Qwen3-8B</li></ul></div>
+            </div>
+            <div class="slot" data-slot="b"></div>
+          </section>
+          <div class="laptop" id="r-laptop">
+            <div class="laptop-list" aria-live="polite">
+              <p class="ll-title"><span><span data-l="en">Available LLM API services</span><span data-l="zh" lang="zh-CN">可连接的 LLM API 服务</span></span><b id="r-status"></b></p>
+              <ul id="r-list"></ul>
+            </div>
+            <svg class="laptop-ico" viewBox="0 0 64 44" aria-hidden="true"><rect class="screen" x="10" y="3" width="44" height="29" rx="3"/><path d="M3 38h58l-4 4H7z"/></svg>
+            <span class="laptop-name"><span data-l="en">Your laptop</span><span data-l="zh" lang="zh-CN">你的笔记本</span></span>
+          </div>
+          <svg class="wires" id="r-wires" aria-hidden="true"></svg>
+        </div>
+        <figcaption class="fig-note"><span data-l="en">Each server's announcements stay inside its own network, so the laptop sees only the services of the network it is on. Network A and B can be any two local networks. Nothing connects until you pick a service from the list.</span><span data-l="zh" lang="zh-CN">每台服务器的公告只在自己所在的网络内传播，所以笔记本只能看到当前网络里的服务。网络 A 和 B 可以是任意两个局域网。你从列表中选择之前，不会接入任何服务。</span></figcaption>
+      </figure>
+    </article>
+
+    <div class="cases">
+      <article class="case">
+        <h3><span data-l="en">A shared workstation in a team</span><span data-l="zh" lang="zh-CN">团队共享工作站</span></h3>
+        <p><span data-l="en">One workstation serves a 32B model and a vision model. New team members open their app and pick them from the list. Nobody maintains a page of IP addresses.</span><span data-l="zh" lang="zh-CN">一台工作站提供 32B 模型和视觉模型。新同事打开应用，从列表里选择即可，不需要有人维护一份 IP 地址文档。</span></p>
+      </article>
+      <article class="case">
+        <h3><span data-l="en">A home lab</span><span data-l="zh" lang="zh-CN">家庭实验室</span></h3>
+        <p><span data-l="en">A desktop with a GPU serves a model at home. Every laptop in the house finds it without setup.</span><span data-l="zh" lang="zh-CN">家里一台带 GPU 的台式机提供模型服务，家里的每台笔记本无需设置就能找到它。</span></p>
+      </article>
+      <article class="case">
+        <h3><span data-l="en">Classrooms, labs and hackathons</span><span data-l="zh" lang="zh-CN">课堂、实验室和黑客松</span></h3>
+        <p><span data-l="en">Organizers run a few model servers on the venue network. Participants choose from a list instead of copying addresses from a slide.</span><span data-l="zh" lang="zh-CN">组织者在现场网络里部署几台模型服务，参与者从列表中选择，不用从幻灯片上抄地址。</span></p>
+      </article>
+      <article class="case">
+        <h3><span data-l="en">Sites without internet access</span><span data-l="zh" lang="zh-CN">没有外网的现场</span></h3>
+        <p><span data-l="en">Factories, field sites and secure labs. Discovery happens entirely on the local network and needs no cloud service.</span><span data-l="zh" lang="zh-CN">工厂、野外站点、涉密实验室。发现过程完全在局域网内完成，不依赖任何云服务。</span></p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- Real client -->
+<section class="band" id="client">
+  <div class="wrap">
+    <p class="eyebrow"><span data-l="en">In a real client</span><span data-l="zh" lang="zh-CN">真实客户端</span></p>
+    <h2><span data-l="en">The same page before and after a network change.</span><span data-l="zh" lang="zh-CN">网络切换前后的同一个页面。</span></h2>
+    <p class="section-lead" data-l="en">The project's plugin adds a LAN services page to DeepSeek Harness, an AI agent app. These screenshots show that page on network A, then on network B.</p>
+    <p class="section-lead" data-l="zh" lang="zh-CN">项目的插件为 AI agent 应用 DeepSeek Harness 增加了“局域网服务”页面。下面两张截图是该页面在网络 A 和网络 B 中的样子。</p>
+    <div class="shots">
+      <figure class="shot">
+        <a href="assets/img/network-a.en.jpg" data-l="en"><img src="assets/img/network-a.en.jpg" width="980" height="684" loading="lazy" alt="LAN LLM services page listing three office services; one is marked Connected."></a>
+        <a href="assets/img/network-a.zh.jpg" data-l="zh"><img src="assets/img/network-a.zh.jpg" width="600" height="696" loading="lazy" alt="局域网 LLM 服务页面，列出三个公司服务，其中一个显示已接入。"></a>
+        <figcaption><strong><span data-l="en">Network A (office).</span><span data-l="zh" lang="zh-CN">网络 A（公司）。</span></strong> <span data-l="en">Three services found. One is connected, one has a saved key.</span><span data-l="zh" lang="zh-CN">发现三个服务，一个已接入，一个已保存 key。</span></figcaption>
+      </figure>
+      <div class="shot-gap" aria-hidden="true">
+        <span class="gap-pill"><span data-l="en">List cleared · waiting</span><span data-l="zh" lang="zh-CN">列表清空 · 等待网络</span></span>
+      </div>
+      <figure class="shot">
+        <a href="assets/img/network-b.en.jpg" data-l="en"><img src="assets/img/network-b.en.jpg" width="980" height="684" loading="lazy" alt="LAN LLM services page on the home network, showing one service with Inspect service and Connect and start chat buttons."></a>
+        <a href="assets/img/network-b.zh.jpg" data-l="zh"><img src="assets/img/network-b.zh.jpg" width="600" height="696" loading="lazy" alt="家庭网络中的局域网 LLM 服务页面，显示一个服务及检查服务、连接并新建会话按钮。"></a>
+        <figcaption><strong><span data-l="en">Network B (home).</span><span data-l="zh" lang="zh-CN">网络 B（家）。</span></strong> <span data-l="en">The office services are gone and a home service appears. It connects only when you choose.</span><span data-l="zh" lang="zh-CN">公司的服务消失，出现家里的服务。只有你选择后才会接入。</span></figcaption>
+      </figure>
+    </div>
+    <p class="fig-note" data-l="en">Controlled test: the two networks were simulated on one physical LAN by signalling the network change to the client, with real DNS-SD and HTTPS traffic. A separate test switched a laptop from Wi-Fi to wired Ethernet and checked discovery and HTTPS on both. API answers are simulated, and model names are display labels; no model weights were running.</p>
+    <p class="fig-note" data-l="zh" lang="zh-CN">受控测试：在一个物理局域网上，通过向客户端发出网络切换信号来模拟两个网络，DNS-SD 和 HTTPS 流量均为真实流量。另有一项测试把笔记本从 Wi-Fi 切换到有线网络，分别验证了切换前后的发现和 HTTPS。API 回答为模拟，模型名称为展示标签，没有运行模型权重。</p>
+  </div>
+</section>
+
+<!-- Benefits -->
+<section class="section" id="benefits">
+  <div class="wrap">
+    <p class="eyebrow"><span data-l="en">Benefits</span><span data-l="zh" lang="zh-CN">好处</span></p>
+    <h2><span data-l="en">Less setup for everyone involved.</span><span data-l="zh" lang="zh-CN">每个参与者都能少做配置。</span></h2>
+    <div class="roles">
+      <div class="role">
+        <h3><span data-l="en">For people who use models</span><span data-l="zh" lang="zh-CN">对使用模型的人</span></h3>
+        <ul class="ticks">
+          <li><span data-l="en">No addresses to type or keep up to date.</span><span data-l="zh" lang="zh-CN">不用输入地址，也不用维护地址。</span></li>
+          <li><span data-l="en">See what is available on the network you are on now.</span><span data-l="zh" lang="zh-CN">随时看到当前网络里有哪些服务。</span></li>
+          <li><span data-l="en">Change networks without reconfiguring your apps.</span><span data-l="zh" lang="zh-CN">换网络不用重新配置应用。</span></li>
+          <li><span data-l="en">Each service shows whether it needs a key and whether one is saved.</span><span data-l="zh" lang="zh-CN">每个服务都会显示是否需要 key、key 是否已保存。</span></li>
+        </ul>
+      </div>
+      <div class="role">
+        <h3><span data-l="en">For people who run models</span><span data-l="zh" lang="zh-CN">对部署模型的人</span></h3>
+        <ul class="ticks">
+          <li><span data-l="en">Announce a service once. Every client on the network sees it.</span><span data-l="zh" lang="zh-CN">公告一次，网络里的所有客户端都能看到。</span></li>
+          <li><span data-l="en">Swap the model behind an endpoint without telling everyone.</span><span data-l="zh" lang="zh-CN">更换某个接入点背后的模型，不用逐个通知。</span></li>
+          <li><span data-l="en">Publish several APIs from one machine, each with its own key policy.</span><span data-l="zh" lang="zh-CN">一台机器可以发布多个 API，各自设定 key 要求。</span></li>
+          <li><span data-l="en">Withdraw a service and it leaves every client's list.</span><span data-l="zh" lang="zh-CN">撤下服务后，它会从所有客户端的列表中消失。</span></li>
+        </ul>
+      </div>
+      <div class="role">
+        <h3><span data-l="en">For people who build apps</span><span data-l="zh" lang="zh-CN">对开发应用的人</span></h3>
+        <ul class="ticks">
+          <li><span data-l="en">A small library returns checked, ready-to-use endpoints.</span><span data-l="zh" lang="zh-CN">一个小型库直接给出校验过的接入地址。</span></li>
+          <li><span data-l="en">Standard mDNS/DNS-SD. No central server, no cloud account.</span><span data-l="zh" lang="zh-CN">基于标准 mDNS/DNS-SD，不需要中心服务器或云账号。</span></li>
+          <li><span data-l="en">Works offline. Discovery traffic stays on the local network.</span><span data-l="zh" lang="zh-CN">离线可用，发现报文不出局域网。</span></li>
+          <li><span data-l="en">Servers and clients that follow the same profile can find each other.</span><span data-l="zh" lang="zh-CN">遵循同一规范的服务端和客户端可以互相发现。</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works (core only) -->
+<section class="band" id="how">
+  <div class="wrap">
+    <p class="eyebrow"><span data-l="en">How it works</span><span data-l="zh" lang="zh-CN">工作原理</span></p>
+    <h2><span data-l="en">Announce, discover, then connect when you choose.</span><span data-l="zh" lang="zh-CN">公告、发现，由你决定何时接入。</span></h2>
+    <p class="section-lead" data-l="en">Two separate paths. Finding a service uses multicast on the local network and carries only hints. Using the service is a normal HTTPS connection, made straight to the API after you choose it.</p>
+    <p class="section-lead" data-l="zh" lang="zh-CN">这里有两条独立的路径。发现服务走局域网组播，只传递线索；使用服务是普通的 HTTPS 连接，在你选择之后直接连到 API。</p>
+
+    <figure class="paths" id="paths" data-phase="1" aria-label="Animated diagram: the advertiser announces over the local network, the discovery core builds a list, and the app connects to the API directly over HTTPS">
+      <div class="paths-scene">
+        <div class="p-frame server"><span><span data-l="en">Service machine</span><span data-l="zh" lang="zh-CN">服务端机器</span></span></div>
+        <div class="p-frame client"><span><span data-l="en">Your laptop</span><span data-l="zh" lang="zh-CN">你的笔记本</span></span></div>
+        <div class="p-box" id="p-api"><strong>LLM API</strong><small>https://studio-llm.local:8443/v1</small></div>
+        <div class="p-box" id="p-adv"><strong><span data-l="en">Advertiser</span><span data-l="zh" lang="zh-CN">公告器</span></strong><small>llm-api-advertiser</small></div>
+        <div class="p-box" id="p-bus"><strong><span data-l="en">Local network</span><span data-l="zh" lang="zh-CN">局域网</span></strong><small>mDNS · 224.0.0.251 · UDP 5353</small></div>
+        <div class="p-box" id="p-app">
+          <strong><span data-l="en">AI app</span><span data-l="zh" lang="zh-CN">AI 应用</span></strong>
+          <ul class="p-list" id="p-list"></ul>
+          <div class="p-check"><span><span data-l="en">certificate ✓</span><span data-l="zh" lang="zh-CN">证书 ✓</span></span><span><span data-l="en">trust settings ✓</span><span data-l="zh" lang="zh-CN">信任设置 ✓</span></span></div>
+        </div>
+        <div class="p-box" id="p-core"><strong><span data-l="en">Discovery core</span><span data-l="zh" lang="zh-CN">发现核心库</span></strong><small>llm-discovery-core</small></div>
+        <p class="p-caption"><span><i></i><span data-l="en">discovery: mDNS, local network only</span><span data-l="zh" lang="zh-CN">发现：mDNS，只在局域网内</span></span><span><i class="solid"></i><span data-l="en">use: HTTPS, direct to the API</span><span data-l="zh" lang="zh-CN">使用：HTTPS，直连 API</span></span></p>
+        <svg class="wires" id="p-wires" aria-hidden="true"></svg>
+      </div>
+      <ol class="phase-steps">
+        <li data-phase="1" class="is-active">
+          <h3><button type="button" aria-pressed="true"><span class="n">1</span><span data-l="en">Announce</span><span data-l="zh" lang="zh-CN">公告</span></button></h3>
+          <p><span data-l="en">A small advertiser runs next to the LLM API. It publishes the service on the local network: its name, host, port, base path, API type, and whether a key is needed.</span><span data-l="zh" lang="zh-CN">LLM API 旁边运行一个小型公告器，把服务的名称、主机、端口、路径、API 类型，以及是否需要 key，发布到局域网中。</span></p>
+        </li>
+        <li data-phase="2">
+          <h3><button type="button" aria-pressed="false"><span class="n">2</span><span data-l="en">Discover</span><span data-l="zh" lang="zh-CN">发现</span></button></h3>
+          <p><span data-l="en">The client asks the network which <code>_llm-api._tcp</code> services exist and builds a list. The list updates as services come and go, and starts over when the device changes networks.</span><span data-l="zh" lang="zh-CN">客户端向网络询问有哪些 <code>_llm-api._tcp</code> 服务，并生成列表。服务上线或下线时列表随之更新，设备换网络时列表重新建立。</span></p>
+        </li>
+        <li data-phase="3">
+          <h3><button type="button" aria-pressed="false"><span class="n">3</span><span data-l="en">Check and connect</span><span data-l="zh" lang="zh-CN">检查并接入</span></button></h3>
+          <p><span data-l="en">You pick a service. The client checks the HTTPS certificate against its own trust settings, reads the model list, and connects. Requests then go straight to that API.</span><span data-l="zh" lang="zh-CN">你选择一个服务后，客户端按自己的信任设置检查 HTTPS 证书，读取模型列表，然后接入。之后的请求直接发往该 API。</span></p>
+        </li>
+      </ol>
+    </figure>
+
+    <div class="how-more">
+      <div>
+        <h3><span data-l="en">What one announcement contains</span><span data-l="zh" lang="zh-CN">一条公告包含什么</span></h3>
+        <p><span data-l="en">Four standard DNS-SD records. Together they give the client a complete endpoint URL, the API type and whether a key is needed. No keys, prompts or model lists travel on the network.</span><span data-l="zh" lang="zh-CN">四条标准的 DNS-SD 记录。它们合起来给出完整的接入 URL、API 类型，以及是否需要 key。网络上不传 key、提示词或模型列表。</span></p>
+        <a class="more" href="technical.html"><span data-l="en">Fields, records and the full discovery flow</span><span data-l="zh" lang="zh-CN">字段、记录与完整的发现流程</span> →</a>
+      </div>
+      <figure class="wire">
+        <figcaption><span data-l="en">One announcement, as the client receives it</span><span data-l="zh" lang="zh-CN">客户端收到的一条公告</span></figcaption>
+<pre class="code" tabindex="0"><code><span class="c-dim">; service type → instance</span>
+<span class="c-key">_llm-api._tcp.local.</span>  PTR  Office-DeepSeek
+<span class="c-dim">; where it is</span>
+Office-DeepSeek  SRV  <span class="c-val">api-office-a.local.</span> port <span class="c-val">8443</span>
+<span class="c-dim">; how to use it</span>
+Office-DeepSeek  TXT  txtvers=<span class="c-val">1</span> api=<span class="c-val">openresponses</span>
+                      protovers=<span class="c-val">2026-04-24</span> scheme=<span class="c-val">https</span>
+                      base=<span class="c-val">/v1</span> auth=<span class="c-val">required</span>
+<span class="c-dim">; address</span>
+api-office-a.local.  A  <span class="c-val">192.168.10.21</span>
+
+<span class="c-dim">→</span> https://api-office-a.local:8443/v1</code></pre>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- Trust -->
+<section class="section" id="trust">
+  <div class="wrap">
+    <p class="eyebrow"><span data-l="en">Safety</span><span data-l="zh" lang="zh-CN">安全</span></p>
+    <h2><span data-l="en">Discovery shows you options. You decide what to trust.</span><span data-l="zh" lang="zh-CN">发现只提供选项，信任由你决定。</span></h2>
+    <div class="trust">
+      <div class="trust-item">
+        <h3><span data-l="en">No secrets on the network</span><span data-l="zh" lang="zh-CN">网络上不传密钥</span></h3>
+        <p><span data-l="en">An announcement says whether a key is required. It never carries a key.</span><span data-l="zh" lang="zh-CN">公告只说明是否需要 key，从不携带 key。</span></p>
+      </div>
+      <div class="trust-item">
+        <h3><span data-l="en">Nothing connects on its own</span><span data-l="zh" lang="zh-CN">不会自动接入</span></h3>
+        <p><span data-l="en">Finding a service, or joining a new network, never connects it or changes the model you use.</span><span data-l="zh" lang="zh-CN">发现一个服务或接入新网络，都不会自动接入，也不会更换你正在用的模型。</span></p>
+      </div>
+      <div class="trust-item">
+        <h3><span data-l="en">Connections are checked</span><span data-l="zh" lang="zh-CN">连接经过校验</span></h3>
+        <p><span data-l="en">Before a key is sent, the client checks the certificate, host name and allowed addresses against its own trust settings.</span><span data-l="zh" lang="zh-CN">发送 key 之前，客户端会按自己的信任设置检查证书、主机名和允许的地址。</span></p>
+      </div>
+      <div class="trust-item">
+        <h3><span data-l="en">A key belongs to one service</span><span data-l="zh" lang="zh-CN">key 只属于一个服务</span></h3>
+        <p><span data-l="en">A service with the same name on another network does not get your key.</span><span data-l="zh" lang="zh-CN">另一个网络里同名的服务，拿不到你的 key。</span></p>
+      </div>
+    </div>
+    <p class="note" data-l="en">In this implementation, the trust settings are a file that the service operator gives to users, listing each service's address and certificate. A moved or new service needs an updated entry before it can be connected. Making trust easier to set up is an open question that the draft leaves for a later revision.</p>
+    <p class="note" data-l="zh" lang="zh-CN">在本实现中，信任设置是服务运营者提供给用户的一个文件，列出每个服务的地址和证书。服务换了位置或新增服务时，需要先更新对应条目才能接入。如何让信任设置更简单，是草案留给后续版本解决的问题。</p>
+  </div>
+</section>
+
+<!-- Components -->
+<section class="band" id="components">
+  <div class="wrap">
+    <p class="eyebrow"><span data-l="en">Open source</span><span data-l="zh" lang="zh-CN">开源组件</span></p>
+    <h2><span data-l="en">Four parts. Use all of them or only the one you need.</span><span data-l="zh" lang="zh-CN">四个组件，可以全部使用，也可以只用需要的那个。</span></h2>
+    <div class="repos">
+      <a class="repo" href="https://github.com/nobrowning/llm-api-advertiser">
+        <p class="repo-for"><span data-l="en">If you run a model server</span><span data-l="zh" lang="zh-CN">如果你部署模型服务</span></p>
+        <p class="repo-name">llm-api-advertiser</p>
+        <p class="repo-desc"><span data-l="en">Announces an existing LLM API on the local network. Command-line tool or Node.js library.</span><span data-l="zh" lang="zh-CN">在局域网中公告已有的 LLM API。可作为命令行工具，也可作为 Node.js 库使用。</span></p>
+      </a>
+      <a class="repo" href="https://github.com/nobrowning/llm-discovery-core">
+        <p class="repo-for"><span data-l="en">If you build a client</span><span data-l="zh" lang="zh-CN">如果你开发客户端</span></p>
+        <p class="repo-name">llm-discovery-core</p>
+        <p class="repo-desc"><span data-l="en">Finds services, checks their records and follows network changes. A Node.js library with no UI.</span><span data-l="zh" lang="zh-CN">发现服务、校验记录、跟随网络变化。不带界面的 Node.js 库。</span></p>
+      </a>
+      <a class="repo" href="https://github.com/nobrowning/dsh-lan-discovery">
+        <p class="repo-for"><span data-l="en">If you use DeepSeek Harness</span><span data-l="zh" lang="zh-CN">如果你使用 DeepSeek Harness</span></p>
+        <p class="repo-name">dsh-lan-discovery</p>
+        <p class="repo-desc"><span data-l="en">A plugin that lists LAN services in Harness and connects the one you choose to a normal conversation.</span><span data-l="zh" lang="zh-CN">在 Harness 中列出局域网服务，并把你选择的服务接入正常对话的插件。</span></p>
+      </a>
+      <a class="repo" href="https://github.com/nobrowning/llm-service-discovery-demo">
+        <p class="repo-for"><span data-l="en">If you want to try it</span><span data-l="zh" lang="zh-CN">如果你想先体验</span></p>
+        <p class="repo-name">llm-service-discovery-demo</p>
+        <p class="repo-desc"><span data-l="en">Two simulated nodes with three APIs on your own network. No GPU, model weights or cloud key needed.</span><span data-l="zh" lang="zh-CN">在你自己的网络中运行两个模拟节点、三个 API。不需要 GPU、模型权重或云端 key。</span></p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Status -->
+<section class="section" id="status">
+  <div class="wrap status-grid">
+    <div>
+      <p class="eyebrow"><span data-l="en">Project status</span><span data-l="zh" lang="zh-CN">项目状态</span></p>
+      <h2><span data-l="en">An experimental implementation of an IETF draft.</span><span data-l="zh" lang="zh-CN">一份 IETF 草案的实验性实现。</span></h2>
+      <p data-l="en">The project implements <a href="https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/"><cite>Discovery of LLM API Services in Local Networks</cite></a> (draft-cui-dawn-local-llm-api-discovery-00). The draft is an individual submission and has no formal IETF standing. This work is for testing the idea and how well implementations work together.</p>
+      <p data-l="zh" lang="zh-CN">本项目实现了 IETF 互联网草案 <a href="https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/"><cite>Discovery of LLM API Services in Local Networks</cite></a>（draft-cui-dawn-local-llm-api-discovery-00）。该草案为个人提交，尚无 IETF 正式地位。本项目用于验证这一思路，以及不同实现之间能否互通。</p>
+      <a class="more" href="#github-projects"><span data-l="en">Explore the four GitHub projects</span><span data-l="zh" lang="zh-CN">查看四个配套 GitHub 项目</span> →</a>
+    </div>
+    <div class="scope">
+      <h3><span data-l="en">Current scope</span><span data-l="zh" lang="zh-CN">当前范围</span></h3>
+      <ul class="dots">
+        <li><span data-l="en">IPv4 mDNS on one network interface at a time.</span><span data-l="zh" lang="zh-CN">一次在一个网络接口上使用 IPv4 mDNS。</span></li>
+        <li><span data-l="en">Services must be on the same local network. No discovery across subnets.</span><span data-l="zh" lang="zh-CN">服务需在同一局域网内，不支持跨子网发现。</span></li>
+        <li><span data-l="en">Following the network automatically is in the current prereleases (discovery core 0.4.0-roaming.1, Harness plugin 0.6.0-roaming.1).</span><span data-l="zh" lang="zh-CN">自动跟随网络属于当前的预发布版本（发现核心库 0.4.0-roaming.1、Harness 插件 0.6.0-roaming.1）。</span></li>
+        <li><span data-l="en">The demo's model answers are simulated.</span><span data-l="zh" lang="zh-CN">Demo 的模型回答是模拟的。</span></li>
+        <li><span data-l="en">No claim of full RFC or draft conformance.</span><span data-l="zh" lang="zh-CN">不声明完全符合 RFC 或草案。</span></li>
+      </ul>
+      <a class="more" href="technical.html#scope"><span data-l="en">Scope and draft compatibility</span><span data-l="zh" lang="zh-CN">范围与草案兼容性</span> →</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-row">
+    <p><span data-l="en">Local LLM API Discovery · MIT License</span><span data-l="zh" lang="zh-CN">局域网 LLM API 发现 · MIT 许可</span></p>
+    <nav aria-label="Footer">
+      <a href="technical.html"><span data-l="en">Technical details</span><span data-l="zh" lang="zh-CN">技术细节</span></a>
+      <a href="https://github.com/nobrowning/llm-service-discovery-demo">GitHub</a>
+      <a href="https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/"><span data-l="en">IETF draft</span><span data-l="zh" lang="zh-CN">IETF 草案</span></a>
+      <a href="https://www.rfc-editor.org/rfc/rfc6762">RFC 6762</a>
+      <a href="https://www.rfc-editor.org/rfc/rfc6763">RFC 6763</a>
+    </nav>
+  </div>
+  <div class="wrap footer-projects" id="github-projects">
+    <h2><span data-l="en">Explore the implementation on GitHub</span><span data-l="zh" lang="zh-CN">在 GitHub 查看配套实现</span></h2>
+    <nav class="footer-project-links" aria-label="GitHub projects / GitHub 项目">
+        <a href="https://github.com/nobrowning/llm-service-discovery-demo"><strong>llm-service-discovery-demo</strong><span data-l="en">Run the demo ↗</span><span data-l="zh" lang="zh-CN">运行演示 ↗</span></a>
+        <a href="https://github.com/nobrowning/dsh-lan-discovery"><strong>dsh-lan-discovery</strong><span data-l="en">Harness plugin ↗</span><span data-l="zh" lang="zh-CN">Harness 插件 ↗</span></a>
+        <a href="https://github.com/nobrowning/llm-api-advertiser"><strong>llm-api-advertiser</strong><span data-l="en">Advertise an API ↗</span><span data-l="zh" lang="zh-CN">公告 API 服务 ↗</span></a>
+        <a href="https://github.com/nobrowning/llm-discovery-core"><strong>llm-discovery-core</strong><span data-l="en">Build a discovery client ↗</span><span data-l="zh" lang="zh-CN">开发发现客户端 ↗</span></a>
+    </nav>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>

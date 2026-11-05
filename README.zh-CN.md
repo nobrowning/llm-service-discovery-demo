@@ -1,5 +1,9 @@
 # 局域网 LLM API 服务发现 Demo
 
+[项目网站](https://nobrowning.github.io/llm-service-discovery-demo/)
+
+[双语网站源码与 GitHub Pages 部署](docs/website.md)
+
 [English](README.md) · [验证报告](docs/validation-report.md) · [协议映射](docs/protocol-mapping.md)
 
 在 DeepSeek Harness 内发现局域网 LLM API，检查服务后接入正常会话。对应 [IETF 草案 -00](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/) 的实现实验。

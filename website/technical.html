@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title data-title-zh="技术细节 · 局域网 LLM API 发现">Technical details · Local LLM API Discovery</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Records, TXT fields, the discovery flow, trust checks and network changes in the Local LLM API Discovery implementation.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/site.css">
+<script>
+(function () {
+  var l = 'en';
+  try {
+    var q = new URLSearchParams(location.search).get('lang');
+    if (q === 'zh' || q === 'en') l = q;
+    else { var s = localStorage.getItem('llmd-lang'); if (s === 'zh' || s === 'en') l = s; }
+  } catch (e) {}
+  document.documentElement.setAttribute('data-lang', l);
+  document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en';
+})();
+</script>
+</head>
+<body>
+<a class="skip" href="#main"><span data-l="en">Skip to content</span><span data-l="zh" lang="zh-CN">跳到正文</span></a>
+
+<header class="site-header">
+  <div class="wrap header-row">
+    <a class="brand" href="index.html" aria-label="Local LLM API Discovery">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="23" r="3.2"/><path d="M9 13.5a9.5 9.5 0 0 1 9.5 9.5" /><path d="M9 6a17 17 0 0 1 17 17"/></svg>
+      <span class="brand-name"><span data-l="en">Local LLM API Discovery</span><span data-l="zh" lang="zh-CN">局域网 LLM API 发现</span></span>
+    </a>
+    <nav class="nav" id="site-nav" aria-label="Main">
+      <a href="index.html#why"><span data-l="en">Why</span><span data-l="zh" lang="zh-CN">为什么需要</span></a>
+      <a href="index.html#scenarios"><span data-l="en">Scenarios</span><span data-l="zh" lang="zh-CN">场景</span></a>
+      <a href="index.html#how"><span data-l="en">How it works</span><span data-l="zh" lang="zh-CN">工作原理</span></a>
+      <a href="technical.html" aria-current="page"><span data-l="en">Technical details</span><span data-l="zh" lang="zh-CN">技术细节</span></a>
+      <a href="https://github.com/nobrowning/llm-service-discovery-demo">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <div class="lang" role="group" aria-label="Language / 语言">
+        <button type="button" data-set-lang="en" aria-pressed="true">EN</button>
+        <button type="button" data-set-lang="zh" aria-pressed="false" lang="zh-CN">中文</button>
+      </div>
+      <button type="button" class="menu-btn" aria-controls="site-nav" aria-expanded="false"><span data-l="en">Menu</span><span data-l="zh" lang="zh-CN">菜单</span></button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<div class="doc-hero">
+  <div class="wrap">
+    <p class="eyebrow"><span data-l="en">Technical details</span><span data-l="zh" lang="zh-CN">技术细节</span></p>
+    <h1><span data-l="en">How services are announced, found, checked and connected.</span><span data-l="zh" lang="zh-CN">服务如何被公告、发现、检查和接入。</span></h1>
+    <p class="section-lead" data-l="en">This page describes the experimental profile implemented by the four repositories. It follows <a href="https://datatracker.ietf.org/doc/html/draft-cui-dawn-local-llm-api-discovery-00">draft-cui-dawn-local-llm-api-discovery-00</a> for the wire format and marks the places where the project adds its own extensions.</p>
+    <p class="section-lead" data-l="zh" lang="zh-CN">本页说明四个仓库实现的实验性规范。线上格式遵循 <a href="https://datatracker.ietf.org/doc/html/draft-cui-dawn-local-llm-api-discovery-00">draft-cui-dawn-local-llm-api-discovery-00</a>，并标出了本项目自行增加的扩展。</p>
+  </div>
+</div>
+
+<div class="wrap doc-layout">
+  <aside class="toc" aria-label="On this page" data-aria-en="On this page" data-aria-zh="本页内容">
+    <p><span data-l="en">On this page</span><span data-l="zh" lang="zh-CN">本页内容</span></p>
+    <ol>
+      <li><a href="#overview"><span data-l="en">Overview</span><span data-l="zh" lang="zh-CN">总览</span></a></li>
+      <li><a href="#records"><span data-l="en">Service type and records</span><span data-l="zh" lang="zh-CN">服务类型与记录</span></a></li>
+      <li><a href="#txt"><span data-l="en">TXT keys</span><span data-l="zh" lang="zh-CN">TXT 字段</span></a></li>
+      <li><a href="#flow"><span data-l="en">Discovery flow</span><span data-l="zh" lang="zh-CN">发现流程</span></a></li>
+      <li><a href="#validation"><span data-l="en">Candidate validation</span><span data-l="zh" lang="zh-CN">候选校验</span></a></li>
+      <li><a href="#http"><span data-l="en">Service HTTP interface</span><span data-l="zh" lang="zh-CN">服务的 HTTP 接口</span></a></li>
+      <li><a href="#trust"><span data-l="en">Trust and API keys</span><span data-l="zh" lang="zh-CN">信任与 API key</span></a></li>
+      <li><a href="#networks"><span data-l="en">Changing networks</span><span data-l="zh" lang="zh-CN">网络切换</span></a></li>
+      <li><a href="#advertiser"><span data-l="en">Advertiser lifecycle</span><span data-l="zh" lang="zh-CN">公告器生命周期</span></a></li>
+      <li><a href="#libraries"><span data-l="en">Using the components</span><span data-l="zh" lang="zh-CN">使用组件</span></a></li>
+      <li><a href="#scope"><span data-l="en">Scope and draft compatibility</span><span data-l="zh" lang="zh-CN">范围与草案兼容性</span></a></li>
+      <li><a href="#references"><span data-l="en">References</span><span data-l="zh" lang="zh-CN">参考资料</span></a></li>
+    </ol>
+  </aside>
+
+  <article class="doc">
+
+    <!-- 1 Overview -->
+    <section id="overview">
+      <h2><span data-l="en">Overview</span><span data-l="zh" lang="zh-CN">总览</span></h2>
+      <p data-l="en">Two separate paths connect a client to a service. Discovery uses multicast DNS on the local link and only carries connection hints. The API itself is reached over a direct HTTPS connection, after the user chooses the service. The advertiser and the discovery client never proxy API requests.</p>
+      <p data-l="zh" lang="zh-CN">客户端和服务之间有两条独立的路径。发现使用本地链路上的组播 DNS，只携带接入线索。用户选择服务后，客户端通过直接的 HTTPS 连接访问 API。公告器和发现客户端都不转发 API 请求。</p>
+      <div class="topo" role="img" aria-label="Service node with LLM API and advertiser; local network carrying mDNS and HTTPS; client device with discovery core and app">
+        <div class="topo-box">
+          <p><span data-l="en">Service node</span><span data-l="zh" lang="zh-CN">服务节点</span></p>
+          <div class="part"><strong>LLM API</strong><span><span data-l="en">HTTPS · <code>/models</code>, <code>/responses</code></span><span data-l="zh" lang="zh-CN">HTTPS · <code>/models</code>、<code>/responses</code></span></span></div>
+          <div class="part"><strong>llm-api-advertiser</strong><span><span data-l="en">Publishes PTR, SRV, TXT, A</span><span data-l="zh" lang="zh-CN">发布 PTR、SRV、TXT、A 记录</span></span></div>
+        </div>
+        <div class="topo-net">
+          <div class="path"><strong>mDNS · 224.0.0.251 · UDP 5353</strong><p><span data-l="en">Announcements and queries on the local link. Hints only.</span><span data-l="zh" lang="zh-CN">本地链路上的公告与查询，只是线索。</span></p></div>
+          <div class="path api"><strong>HTTPS · TCP</strong><p><span data-l="en">Direct API traffic, after the user chooses and the client checks trust.</span><span data-l="zh" lang="zh-CN">用户选择、客户端完成信任检查后，直接访问 API。</span></p></div>
+        </div>
+        <div class="topo-box">
+          <p><span data-l="en">Client device</span><span data-l="zh" lang="zh-CN">客户端设备</span></p>
+          <div class="part"><strong>llm-discovery-core</strong><span><span data-l="en">Browses, resolves, validates, follows the network</span><span data-l="zh" lang="zh-CN">浏览、解析、校验、跟随网络</span></span></div>
+          <div class="part"><strong>dsh-lan-discovery</strong><span><span data-l="en">Service list, trust checks, keys, model route</span><span data-l="zh" lang="zh-CN">服务列表、信任检查、key、模型路由</span></span></div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><span data-l="en">Component</span><span data-l="zh" lang="zh-CN">组件</span></th>
+            <th><span data-l="en">Runs on</span><span data-l="zh" lang="zh-CN">运行位置</span></th>
+            <th><span data-l="en">Does</span><span data-l="zh" lang="zh-CN">负责</span></th>
+            <th><span data-l="en">Does not</span><span data-l="zh" lang="zh-CN">不负责</span></th>
+          </tr></thead>
+          <tbody>
+            <tr><td><code>llm-api-advertiser</code></td><td><span data-l="en">Service node</span><span data-l="zh" lang="zh-CN">服务节点</span></td><td><span data-l="en">Publishes records, answers queries, withdraws services</span><span data-l="zh" lang="zh-CN">发布记录、应答查询、撤销服务</span></td><td><span data-l="en">Start the API, check its health, hand out keys</span><span data-l="zh" lang="zh-CN">启动 API、检查健康状态、分发 key</span></td></tr>
+            <tr><td><code>llm-discovery-core</code></td><td><span data-l="en">Client</span><span data-l="zh" lang="zh-CN">客户端</span></td><td><span data-l="en">Browses, resolves, validates, tracks lifetimes and network changes</span><span data-l="zh" lang="zh-CN">浏览、解析、校验，跟踪记录寿命和网络变化</span></td><td><span data-l="en">Connect, decide trust, send credentials</span><span data-l="zh" lang="zh-CN">建立连接、判断信任、发送凭据</span></td></tr>
+            <tr><td><code>dsh-lan-discovery</code></td><td><span data-l="en">Client (Harness)</span><span data-l="zh" lang="zh-CN">客户端（Harness）</span></td><td><span data-l="en">Shows the list, checks trust and TLS, manages keys, registers the model route</span><span data-l="zh" lang="zh-CN">展示列表、检查信任和 TLS、管理 key、注册模型路由</span></td><td><span data-l="en">Change system DNS, certificates or firewall</span><span data-l="zh" lang="zh-CN">修改系统 DNS、证书或防火墙</span></td></tr>
+            <tr><td><span data-l="en">LLM API</span><span data-l="zh" lang="zh-CN">LLM API</span></td><td><span data-l="en">Service node</span><span data-l="zh" lang="zh-CN">服务节点</span></td><td><span data-l="en">Serves models, capabilities and responses</span><span data-l="zh" lang="zh-CN">提供模型列表、能力信息和推理响应</span></td><td><span data-l="en">Take part in discovery</span><span data-l="zh" lang="zh-CN">参与发现过程</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 2 Records -->
+    <section id="records">
+      <h2><span data-l="en">Service type and records</span><span data-l="zh" lang="zh-CN">服务类型与记录</span></h2>
+      <p data-l="en">Services use the DNS-SD service type <code>_llm-api._tcp.local.</code> The <code>_tcp</code> label describes how the API is reached. Discovery messages themselves travel over UDP multicast. The service type is proposed by the draft and is not yet registered with IANA.</p>
+      <p data-l="zh" lang="zh-CN">服务使用 DNS-SD 服务类型 <code>_llm-api._tcp.local.</code>。其中 <code>_tcp</code> 描述的是访问 API 的传输方式，发现报文本身通过 UDP 组播传输。该服务类型由草案提出，尚未在 IANA 注册。</p>
+      <p data-l="en">Four record types together describe one endpoint. A client reads them in this logical order. In practice several records can arrive in one packet or come from cache.</p>
+      <p data-l="zh" lang="zh-CN">四类记录共同描述一个接入点。客户端按下面的逻辑顺序读取；实际中多条记录可能在同一个报文中到达，也可能来自缓存。</p>
+      <ol class="chain">
+        <li><span class="rr">PTR</span><span class="q"><span data-l="en">Which instances exist?</span><span data-l="zh" lang="zh-CN">有哪些实例？</span></span><span class="a"><span data-l="en">Service type → instance names</span><span data-l="zh" lang="zh-CN">服务类型 → 实例名</span></span></li>
+        <li><span class="rr">SRV</span><span class="q"><span data-l="en">Where is it?</span><span data-l="zh" lang="zh-CN">服务在哪里？</span></span><span class="a"><span data-l="en">Instance → host name and port</span><span data-l="zh" lang="zh-CN">实例 → 主机名和端口</span></span></li>
+        <li><span class="rr">TXT</span><span class="q"><span data-l="en">How is it used?</span><span data-l="zh" lang="zh-CN">如何使用？</span></span><span class="a"><span data-l="en">Scheme, base path, API profile, auth hint</span><span data-l="zh" lang="zh-CN">scheme、base 路径、API profile、认证提示</span></span></li>
+        <li><span class="rr">A / AAAA</span><span class="q"><span data-l="en">Which address?</span><span data-l="zh" lang="zh-CN">连接哪个地址？</span></span><span class="a"><span data-l="en">Host name → IP address</span><span data-l="zh" lang="zh-CN">主机名 → IP 地址</span></span></li>
+      </ol>
+<pre class="code" tabindex="0"><code><span class="c-dim">; One service, as published by the advertiser (TTL 120 s by default)</span>
+<span class="c-key">_llm-api._tcp.local.</span>                  PTR  Office-DeepSeek._llm-api._tcp.local.
+<span class="c-key">Office-DeepSeek._llm-api._tcp.local.</span>  SRV  0 0 <span class="c-val">8443</span> <span class="c-val">api-office-a.local.</span>
+<span class="c-key">Office-DeepSeek._llm-api._tcp.local.</span>  TXT  "txtvers=<span class="c-val">1</span>" "api=<span class="c-val">openresponses</span>" "protovers=<span class="c-val">2026-04-24</span>"
+                                           "scheme=<span class="c-val">https</span>" "base=<span class="c-val">/v1</span>" "auth=<span class="c-val">required</span>"
+<span class="c-key">api-office-a.local.</span>                   A    <span class="c-val">192.168.10.21</span></code></pre>
+      <div class="result">
+        <p class="label"><span data-l="en">Resulting endpoint</span><span data-l="zh" lang="zh-CN">组合得到的接入点</span></p>
+        <p><code>https://api-office-a.local:8443/v1</code></p>
+        <p><code>POST https://api-office-a.local:8443/v1/responses</code></p>
+      </div>
+      <p data-l="en">The URL is <code>scheme://SRV-target:SRV-port + base</code>. The base path is always taken from the record and never assumed to be <code>/v1</code>. One host can publish several services, for example <code>/text/v1</code> and <code>/vision/v1</code> on the same port. Each is its own instance with its own key policy, so a client must never merge services by IP address.</p>
+      <p data-l="zh" lang="zh-CN">URL 由 <code>scheme://SRV 目标主机:SRV 端口 + base</code> 组成。base 路径始终从记录中读取，不会默认补成 <code>/v1</code>。同一台主机可以发布多个服务，例如同一端口上的 <code>/text/v1</code> 和 <code>/vision/v1</code>。它们是各自独立的实例，各有自己的 key 策略，所以客户端不能按 IP 地址合并服务。</p>
+    </section>
+
+    <!-- 3 TXT -->
+    <section id="txt">
+      <h2><span data-l="en">TXT keys</span><span data-l="zh" lang="zh-CN">TXT 字段</span></h2>
+      <p data-l="en">The TXT record stays small. It holds only what is needed to build and interpret the endpoint.</p>
+      <p data-l="zh" lang="zh-CN">TXT 记录保持精简，只包含组成和理解接入点所需的信息。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><span data-l="en">Key</span><span data-l="zh" lang="zh-CN">字段</span></th>
+            <th><span data-l="en">Draft</span><span data-l="zh" lang="zh-CN">草案要求</span></th>
+            <th><span data-l="en">Example</span><span data-l="zh" lang="zh-CN">示例</span></th>
+            <th><span data-l="en">Meaning and rules in this implementation</span><span data-l="zh" lang="zh-CN">含义及本实现的规则</span></th>
+          </tr></thead>
+          <tbody>
+            <tr><td><code>txtvers</code></td><td><span data-l="en">Required</span><span data-l="zh" lang="zh-CN">必填</span></td><td><code>1</code></td><td><span data-l="en">TXT format version. Only <code>1</code> is accepted. The advertiser publishes it first.</span><span data-l="zh" lang="zh-CN">TXT 格式版本。只接受 <code>1</code>，公告器把它放在第一项。</span></td></tr>
+            <tr><td><code>api</code></td><td><span data-l="en">Required</span><span data-l="zh" lang="zh-CN">必填</span></td><td><code>openresponses</code></td><td><span data-l="en">API profile. Different profiles are not interchangeable. Only <code>openresponses</code> is connectable today.</span><span data-l="zh" lang="zh-CN">API profile。不同 profile 不能互换。目前只有 <code>openresponses</code> 可以接入。</span></td></tr>
+            <tr><td><code>protovers</code></td><td><span data-l="en">When the binding needs it</span><span data-l="zh" lang="zh-CN">绑定需要时必填</span></td><td><code>2026-04-24</code></td><td><span data-l="en">Profile version. The Open Responses binding uses <code>2026-04-24</code>.</span><span data-l="zh" lang="zh-CN">profile 版本。Open Responses 绑定使用 <code>2026-04-24</code>。</span></td></tr>
+            <tr><td><code>scheme</code></td><td><span data-l="en">Required</span><span data-l="zh" lang="zh-CN">必填</span></td><td><code>https</code></td><td><span data-l="en"><code>http</code> or <code>https</code>. The Harness plugin connects only over HTTPS.</span><span data-l="zh" lang="zh-CN"><code>http</code> 或 <code>https</code>。Harness 插件只通过 HTTPS 接入。</span></td></tr>
+            <tr><td><code>base</code></td><td><span data-l="en">Required</span><span data-l="zh" lang="zh-CN">必填</span></td><td><code>/v1</code></td><td><span data-l="en">API base path. <code>/</code> or an absolute path without a trailing slash, query, fragment, or <code>.</code>/<code>..</code> segments. Malformed values are rejected, never repaired.</span><span data-l="zh" lang="zh-CN">API 根路径。可以是 <code>/</code>，或不以斜杠结尾、不含查询串、片段及 <code>.</code>/<code>..</code> 段的绝对路径。格式错误的值直接拒绝，不做修正。</span></td></tr>
+            <tr><td><code>auth</code></td><td><span data-l="en">Optional</span><span data-l="zh" lang="zh-CN">可选</span></td><td><code>required</code></td><td><span data-l="en">Whether a key is needed: <code>required</code> or <code>none</code>. A hint only. It never carries a credential, and <code>none</code> is not permission to connect.</span><span data-l="zh" lang="zh-CN">是否需要 key：<code>required</code> 或 <code>none</code>。仅为提示，从不携带凭据；<code>none</code> 也不代表允许连接。</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li data-l="en">Keys are compared without case. If a key appears twice, the first value wins. Unknown keys are ignored.</li>
+        <li data-l="zh" lang="zh-CN">字段名不区分大小写；同一字段出现两次时取第一个值；未知字段忽略。</li>
+        <li data-l="en">Host and port belong in SRV, and addresses in A/AAAA. They are not repeated in TXT.</li>
+        <li data-l="zh" lang="zh-CN">主机名和端口在 SRV 中，地址在 A/AAAA 中，不在 TXT 中重复。</li>
+        <li data-l="en">Keys, prompts, model catalogs and hardware details never go in TXT. Model details are read later over HTTPS.</li>
+        <li data-l="zh" lang="zh-CN">key、提示词、模型目录和硬件信息都不放进 TXT。模型详情之后通过 HTTPS 读取。</li>
+      </ul>
+    </section>
+
+    <!-- 4 Flow -->
+    <section id="flow">
+      <h2><span data-l="en">Discovery flow</span><span data-l="zh" lang="zh-CN">发现流程</span></h2>
+      <p data-l="en">From a service starting up to a request reaching it. Steps 1 to 6 happen automatically. Steps 7 and 8 happen only when the user acts.</p>
+      <p data-l="zh" lang="zh-CN">从服务启动到请求到达服务的全过程。第 1 到 6 步自动完成，第 7、8 步只在用户操作时发生。</p>
+      <figure class="diagram">
+        <div class="diagram-scroll"><svg viewBox="0 0 920 650" role="img" aria-labelledby="seq-title"><title id="seq-title">Sequence of messages from service start to a request and withdrawal</title><rect class="band-user" x="10" y="352" width="900" height="140" rx="8"/><text x="22" y="372" text-anchor="start" class="t-muted" data-l="en">After you choose a service</text><text x="22" y="372" text-anchor="start" class="t-muted" data-l="zh" lang="zh-CN">你选择服务之后</text><line class="life" x1="90" y1="64" x2="90" y2="636"/><rect class="lane " x="12" y="12" width="156" height="50" rx="8"/><text x="90" y="33" text-anchor="middle" class="t-head">LLM API</text><text x="90" y="51" text-anchor="middle" class="t-muted" data-l="en">service machine</text><text x="90" y="51" text-anchor="middle" class="t-muted" data-l="zh" lang="zh-CN">服务端机器</text><line class="life" x1="275" y1="64" x2="275" y2="636"/><rect class="lane " x="197" y="12" width="156" height="50" rx="8"/><text x="275" y="33" text-anchor="middle" class="t-head" data-l="en">Advertiser</text><text x="275" y="33" text-anchor="middle" class="t-head" data-l="zh" lang="zh-CN">公告器</text><text x="275" y="51" text-anchor="middle" class="t-muted" data-l="en">service machine</text><text x="275" y="51" text-anchor="middle" class="t-muted" data-l="zh" lang="zh-CN">服务端机器</text><line class="life" x1="460" y1="64" x2="460" y2="636"/><rect class="lane group" x="382" y="12" width="156" height="50" rx="8"/><text x="460" y="33" text-anchor="middle" class="t-head" data-l="en">mDNS group</text><text x="460" y="33" text-anchor="middle" class="t-head" data-l="zh" lang="zh-CN">mDNS 组播</text><text x="460" y="51" text-anchor="middle" class="t-muted t-mono">224.0.0.251:5353</text><line class="life" x1="645" y1="64" x2="645" y2="636"/><rect class="lane " x="567" y="12" width="156" height="50" rx="8"/><text x="645" y="33" text-anchor="middle" class="t-head" data-l="en">Discovery core</text><text x="645" y="33" text-anchor="middle" class="t-head" data-l="zh" lang="zh-CN">发现核心库</text><text x="645" y="51" text-anchor="middle" class="t-muted" data-l="en">your laptop</text><text x="645" y="51" text-anchor="middle" class="t-muted" data-l="zh" lang="zh-CN">你的笔记本</text><line class="life" x1="830" y1="64" x2="830" y2="636"/><rect class="lane " x="752" y="12" width="156" height="50" rx="8"/><text x="830" y="33" text-anchor="middle" class="t-head" data-l="en">Harness plugin</text><text x="830" y="33" text-anchor="middle" class="t-head" data-l="zh" lang="zh-CN">Harness 插件</text><text x="830" y="51" text-anchor="middle" class="t-muted" data-l="en">your laptop · you choose</text><text x="830" y="51" text-anchor="middle" class="t-muted" data-l="zh" lang="zh-CN">你的笔记本 · 由你选择</text><line class="msg mdns" x1="275" y1="104" x2="454" y2="104"/><polygon class="head mdns" points="460.0,104.0 451.0,99.5 451.0,108.5"/><text x="367.5" y="97" text-anchor="middle" class="t-mdns" data-l="en">probe: names free?</text><text x="367.5" y="97" text-anchor="middle" class="t-mdns" data-l="zh" lang="zh-CN">探测：名称是否空闲</text><line class="msg mdns" x1="275" y1="146" x2="454" y2="146"/><polygon class="head mdns" points="460.0,146.0 451.0,141.5 451.0,150.5"/><text x="367.5" y="139" text-anchor="middle" class="t-mdns" data-l="en">announce ×2 · PTR SRV TXT A</text><text x="367.5" y="139" text-anchor="middle" class="t-mdns" data-l="zh" lang="zh-CN">公告 ×2 · PTR SRV TXT A</text><line class="msg mdns" x1="645" y1="196" x2="466" y2="196"/><polygon class="head mdns" points="460.0,196.0 469.0,200.5 469.0,191.5"/><text x="552.5" y="189" text-anchor="middle" class="t-mdns" data-l="en">query PTR _llm-api._tcp</text><text x="552.5" y="189" text-anchor="middle" class="t-mdns" data-l="zh" lang="zh-CN">查询 PTR _llm-api._tcp</text><line class="msg mdns reply" x1="460" y1="238" x2="639" y2="238"/><polygon class="head mdns" points="645.0,238.0 636.0,233.5 636.0,242.5"/><text x="552.5" y="231" text-anchor="middle" class="t-mdns" data-l="en">answers · PTR SRV TXT A</text><text x="552.5" y="231" text-anchor="middle" class="t-mdns" data-l="zh" lang="zh-CN">应答 · PTR SRV TXT A</text><rect class="note" x="563" y="258" width="164" height="30" rx="6"/><text x="645" y="278" text-anchor="middle" data-l="en">validate · build base URL</text><text x="645" y="278" text-anchor="middle" data-l="zh" lang="zh-CN">校验 · 组合 base URL</text><line class="msg " x1="645" y1="324" x2="824" y2="324"/><polygon class="head " points="830.0,324.0 821.0,319.5 821.0,328.5"/><text x="737.5" y="317" text-anchor="middle" data-l="en">event: added</text><text x="737.5" y="317" text-anchor="middle" data-l="zh" lang="zh-CN">事件：added</text><line class="msg https" x1="830" y1="404" x2="96" y2="404"/><polygon class="head https" points="90.0,404.0 99.0,408.5 99.0,399.5"/><text x="460.0" y="397" text-anchor="middle" class="t-https">GET /models · /_llm/capabilities</text><text x="460.0" y="419" text-anchor="middle" class="t-muted" data-l="en">after the trust and certificate checks</text><text x="460.0" y="419" text-anchor="middle" class="t-muted" data-l="zh" lang="zh-CN">先通过信任与证书检查</text><line class="msg https" x1="830" y1="450" x2="96" y2="450"/><polygon class="head https" points="90.0,450.0 99.0,454.5 99.0,445.5"/><text x="460.0" y="443" text-anchor="middle" class="t-https">POST /responses</text><line class="msg https reply" x1="90" y1="478" x2="824" y2="478"/><polygon class="head https" points="830.0,478.0 821.0,473.5 821.0,482.5"/><text x="460.0" y="471" text-anchor="middle" class="t-https" data-l="en">streamed events (SSE)</text><text x="460.0" y="471" text-anchor="middle" class="t-https" data-l="zh" lang="zh-CN">流式事件（SSE）</text><line class="msg mdns" x1="275" y1="540" x2="454" y2="540"/><polygon class="head mdns" points="460.0,540.0 451.0,535.5 451.0,544.5"/><text x="367.5" y="533" text-anchor="middle" class="t-mdns">goodbye · TTL 0</text><line class="msg mdns reply" x1="460" y1="580" x2="639" y2="580"/><polygon class="head mdns" points="645.0,580.0 636.0,575.5 636.0,584.5"/><text x="552.5" y="573" text-anchor="middle" class="t-mdns">goodbye</text><line class="msg " x1="645" y1="620" x2="824" y2="620"/><polygon class="head " points="830.0,620.0 821.0,615.5 821.0,624.5"/><text x="737.5" y="613" text-anchor="middle" data-l="en">event: removed</text><text x="737.5" y="613" text-anchor="middle" data-l="zh" lang="zh-CN">事件：removed</text></svg></div>
+        <figcaption><span data-l="en">Green arrows are discovery messages, sent by multicast on the local network. Blue arrows are API traffic, sent directly over HTTPS and only after you choose a service. Dashed arrows are replies. The numbered steps below follow the same order.</span><span data-l="zh" lang="zh-CN">绿色箭头是发现报文，通过组播在局域网内发送。蓝色箭头是 API 流量，只在你选择服务之后，通过 HTTPS 直接发送。虚线箭头表示应答。下面的编号步骤按同样的顺序展开。</span></figcaption>
+      </figure>
+      <ol class="flow">
+        <li>
+          <h3><span class="who adv"><span data-l="en">Advertiser</span><span data-l="zh" lang="zh-CN">公告器</span></span><span data-l="en">Probe for conflicts</span><span data-l="zh" lang="zh-CN">探测名称冲突</span></h3>
+          <div class="flow-body"><p data-l="en">Before announcing, the advertiser asks whether its instance and host names are already in use. A conflict stops startup instead of silently renaming the service.</p><p data-l="zh" lang="zh-CN">公告之前，公告器先查询实例名和主机名是否已被占用。发生冲突时停止启动，不会悄悄给服务改名。</p></div>
+        </li>
+        <li>
+          <h3><span class="who adv"><span data-l="en">Advertiser</span><span data-l="zh" lang="zh-CN">公告器</span></span><span data-l="en">Announce and answer</span><span data-l="zh" lang="zh-CN">公告并应答</span></h3>
+          <div class="flow-body"><p data-l="en">It sends its records twice at startup, then answers matching queries. Known-answer suppression avoids repeating what a client already has. Records live for 120 seconds by default.</p><p data-l="zh" lang="zh-CN">启动时发送两次公告，之后应答匹配的查询。已知答案抑制（known-answer suppression）避免重复发送客户端已有的记录。记录默认有效期为 120 秒。</p></div>
+        </li>
+        <li>
+          <h3><span class="who cli"><span data-l="en">Client</span><span data-l="zh" lang="zh-CN">客户端</span></span><span data-l="en">Browse</span><span data-l="zh" lang="zh-CN">浏览</span></h3>
+          <div class="flow-body"><p data-l="en">The discovery core joins <code>224.0.0.251:5353</code> on one selected IPv4 interface and queries PTR <code>_llm-api._tcp.local.</code> It repeats the query periodically (every 10 seconds by default) and refreshes records before they expire.</p><p data-l="zh" lang="zh-CN">发现核心库在选定的一张 IPv4 网卡上加入 <code>224.0.0.251:5353</code>，查询 PTR <code>_llm-api._tcp.local.</code>。它会定期重复查询（默认每 10 秒），并在记录过期前刷新。</p></div>
+        </li>
+        <li>
+          <h3><span class="who cli"><span data-l="en">Client</span><span data-l="zh" lang="zh-CN">客户端</span></span><span data-l="en">Resolve</span><span data-l="zh" lang="zh-CN">解析</span></h3>
+          <div class="flow-body"><p data-l="en">For each instance it collects SRV, TXT and A/AAAA from answers and its cache, and asks for any record that is still missing.</p><p data-l="zh" lang="zh-CN">对每个实例，从应答和缓存中收集 SRV、TXT 和 A/AAAA 记录，缺少的记录会再发查询。</p></div>
+        </li>
+        <li>
+          <h3><span class="who cli"><span data-l="en">Client</span><span data-l="zh" lang="zh-CN">客户端</span></span><span data-l="en">Validate and build the endpoint</span><span data-l="zh" lang="zh-CN">校验并组合接入点</span></h3>
+          <div class="flow-body"><p data-l="en">Once the records are complete, it checks the TXT keys, host name, port and addresses (see <a href="#validation">Candidate validation</a>) and builds the base URL. Invalid candidates are reported but never become connectable.</p><p data-l="zh" lang="zh-CN">记录凑齐后，检查 TXT 字段、主机名、端口和地址（见<a href="#validation">候选校验</a>），并组合出 base URL。无效候选会被报告，但不会成为可接入的候选。</p></div>
+        </li>
+        <li>
+          <h3><span class="who cli"><span data-l="en">Client</span><span data-l="zh" lang="zh-CN">客户端</span></span><span data-l="en">Keep a live candidate list</span><span data-l="zh" lang="zh-CN">维护候选列表</span></h3>
+          <div class="flow-body"><p data-l="en">Each candidate carries its instance name, base URL, addresses, auth hint, network attachment, expiry time, validation result and a generation number, so the app can reject a stale selection. Subscribers receive <code>added</code>, <code>updated</code>, <code>invalid</code>, <code>removed</code>, <code>network</code>, <code>status</code> and <code>warning</code> events (<code>network</code> from 0.4.0-roaming.1).</p><p data-l="zh" lang="zh-CN">每个候选包含实例名、base URL、地址、认证提示、网络附着信息、过期时间、校验结果和代次号，应用可以据此拒绝过时的选择。订阅方会收到 <code>added</code>、<code>updated</code>、<code>invalid</code>、<code>removed</code>、<code>network</code>、<code>status</code> 和 <code>warning</code> 事件（<code>network</code> 事件自 0.4.0-roaming.1 起提供）。</p></div>
+        </li>
+        <li>
+          <h3><span class="who usr"><span data-l="en">User</span><span data-l="zh" lang="zh-CN">用户</span></span><span data-l="en">Inspect</span><span data-l="zh" lang="zh-CN">检查服务</span></h3>
+          <div class="flow-body"><p data-l="en">Only when the user asks, the client checks its local trust settings and the TLS certificate, then reads <code>GET {base}/models</code> and <code>GET {base}/_llm/capabilities</code>. Discovery by itself sends no API request.</p><p data-l="zh" lang="zh-CN">只有在用户要求时，客户端才会检查本地信任设置和 TLS 证书，然后读取 <code>GET {base}/models</code> 和 <code>GET {base}/_llm/capabilities</code>。单纯的发现不会发出任何 API 请求。</p></div>
+        </li>
+        <li>
+          <h3><span class="who usr"><span data-l="en">User</span><span data-l="zh" lang="zh-CN">用户</span></span><span data-l="en">Connect</span><span data-l="zh" lang="zh-CN">接入</span></h3>
+          <div class="flow-body"><p data-l="en">With a key if the service needs one. The plugin registers a model route in Harness. Conversation requests go straight to <code>POST {base}/responses</code> over HTTPS.</p><p data-l="zh" lang="zh-CN">如果服务需要 key，则带上 key。插件在 Harness 中注册模型路由，对话请求通过 HTTPS 直接发往 <code>POST {base}/responses</code>。</p></div>
+        </li>
+        <li>
+          <h3><span class="who both"><span data-l="en">Both sides</span><span data-l="zh" lang="zh-CN">双方</span></span><span data-l="en">Stay current</span><span data-l="zh" lang="zh-CN">保持更新</span></h3>
+          <div class="flow-body"><p data-l="en">Changed records replace old ones. A service that stops normally sends a goodbye (TTL 0) and leaves the list within about a second. A service that crashes leaves when its records expire. A network change clears every candidate and starts again from step 3.</p><p data-l="zh" lang="zh-CN">记录变化时替换旧数据。正常停止的服务会发送 goodbye（TTL 为 0），约一秒内从列表中移除；异常退出的服务等记录过期后移除。网络切换时清空所有候选，从第 3 步重新开始。</p></div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- 5 Validation -->
+    <section id="validation">
+      <h2><span data-l="en">Candidate validation</span><span data-l="zh" lang="zh-CN">候选校验</span></h2>
+      <p data-l="en">Records go through two stages. Some are never shown at all; others are listed but marked <code>invalid</code>, with the reasons and no base URL.</p>
+      <p data-l="zh" lang="zh-CN">记录要经过两道关。有些记录根本不会出现在列表中；另一些会被列出，但标记为 <code>invalid</code>，附上原因，且不生成 base URL。</p>
+      <h3><span data-l="en">Not listed</span><span data-l="zh" lang="zh-CN">不会列出</span></h3>
+      <ul>
+        <li data-l="en">The instance does not yet have a PTR, SRV and TXT record and at least one A/AAAA address. The client asks for the missing records and waits; SRV and TXT alone never make a candidate.</li>
+        <li data-l="zh" lang="zh-CN">实例还没有凑齐 PTR、SRV、TXT 记录和至少一个 A/AAAA 地址。客户端会查询缺少的记录并等待；只有 SRV 和 TXT 不会生成候选。</li>
+        <li data-l="en">A TXT string is longer than 255 bytes. The record is dropped.</li>
+        <li data-l="zh" lang="zh-CN">某个 TXT 字符串超过 255 字节，该记录会被丢弃。</li>
+        <li data-l="en">The packet arrived on an old socket after a network change. It is ignored.</li>
+        <li data-l="zh" lang="zh-CN">网络切换后从旧 socket 迟到的报文，直接忽略。</li>
+      </ul>
+      <h3><span data-l="en">Listed as invalid</span><span data-l="zh" lang="zh-CN">列为无效</span></h3>
+      <ul>
+        <li data-l="en"><code>txtvers</code>, <code>api</code>, <code>scheme</code> or <code>base</code> is missing or empty, or <code>txtvers</code> is not <code>1</code>.</li>
+        <li data-l="zh" lang="zh-CN"><code>txtvers</code>、<code>api</code>、<code>scheme</code> 或 <code>base</code> 缺失或为空，或 <code>txtvers</code> 不是 <code>1</code>。</li>
+        <li data-l="en">The profile is not <code>api=openresponses</code> with <code>protovers=2026-04-24</code>, or <code>scheme</code> is not <code>http</code> or <code>https</code>.</li>
+        <li data-l="zh" lang="zh-CN">profile 不是 <code>api=openresponses</code> 加 <code>protovers=2026-04-24</code>，或 <code>scheme</code> 不是 <code>http</code>、<code>https</code>。</li>
+        <li data-l="en"><code>base</code> breaks the path rules. This implementation also rejects encoded separators (<code>%2F</code>, <code>%5C</code>), encoded dot segments and control characters.</li>
+        <li data-l="zh" lang="zh-CN"><code>base</code> 不符合路径规则。本实现还会拒绝编码后的分隔符（<code>%2F</code>、<code>%5C</code>）、编码后的点段和控制字符。</li>
+        <li data-l="en"><code>auth</code> is missing for an Open Responses service, because the client cannot tell what the service expects, or it has a value other than <code>required</code> or <code>none</code>.</li>
+        <li data-l="zh" lang="zh-CN">Open Responses 服务缺少 <code>auth</code>（客户端无法判断服务的要求），或其值不是 <code>required</code>、<code>none</code>。</li>
+        <li data-l="en">The SRV target is not a valid <code>.local</code> host name, the port is outside 1 to 65535, or no address is a valid IP address.</li>
+        <li data-l="zh" lang="zh-CN">SRV 目标不是合法的 <code>.local</code> 主机名，端口不在 1 到 65535 之间，或没有一个地址是合法的 IP 地址。</li>
+      </ul>
+    </section>
+
+    <!-- 6 HTTP -->
+    <section id="http">
+      <h2><span data-l="en">Service HTTP interface</span><span data-l="zh" lang="zh-CN">服务的 HTTP 接口</span></h2>
+      <p data-l="en">Discovery tells the client where the API is. To be usable from the Harness plugin, a service implements these routes under its announced base path. All three use the same authentication policy.</p>
+      <p data-l="zh" lang="zh-CN">发现只告诉客户端 API 在哪里。要被 Harness 插件使用，服务需要在公告的 base 路径下实现以下接口，三者使用相同的认证策略。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><span data-l="en">Route</span><span data-l="zh" lang="zh-CN">接口</span></th>
+            <th><span data-l="en">Purpose</span><span data-l="zh" lang="zh-CN">用途</span></th>
+            <th><span data-l="en">Defined by</span><span data-l="zh" lang="zh-CN">定义来源</span></th>
+          </tr></thead>
+          <tbody>
+            <tr><td><code>GET {base}/models</code></td><td><span data-l="en">List of model IDs</span><span data-l="zh" lang="zh-CN">模型 ID 列表</span></td><td><span data-l="en">Common list format used by this project</span><span data-l="zh" lang="zh-CN">本项目采用的通用列表格式</span></td></tr>
+            <tr><td><code>GET {base}/_llm/capabilities</code></td><td><span data-l="en">Capabilities and display metadata</span><span data-l="zh" lang="zh-CN">能力与展示信息</span></td><td><span data-l="en">Project extension, not part of the draft</span><span data-l="zh" lang="zh-CN">本项目扩展，不属于草案</span></td></tr>
+            <tr><td><code>POST {base}/responses</code></td><td><span data-l="en">Create a response, streamed with SSE</span><span data-l="zh" lang="zh-CN">生成响应，通过 SSE 流式返回</span></td><td><span data-l="en">Open Responses binding, version 2026-04-24</span><span data-l="zh" lang="zh-CN">Open Responses 绑定，版本 2026-04-24</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+<pre class="code" tabindex="0"><code><span class="c-dim">// GET https://api-office-a.local:8443/v1/_llm/capabilities</span>
+{
+  <span class="c-key">"schema"</span>: <span class="c-val">"llm-api-discovery-capabilities/v1"</span>,
+  <span class="c-key">"revision"</span>: <span class="c-val">"1"</span>,
+  <span class="c-key">"cache_max_age_seconds"</span>: <span class="c-val">60</span>,
+  <span class="c-key">"mock"</span>: <span class="c-val">false</span>,
+  <span class="c-key">"node_label"</span>: <span class="c-val">"workstation.local"</span>,
+  <span class="c-key">"models"</span>: [{
+    <span class="c-key">"id"</span>: <span class="c-val">"my-model"</span>,
+    <span class="c-key">"display_name"</span>: <span class="c-val">"Qwen3-8B"</span>,
+    <span class="c-key">"deployment"</span>: { <span class="c-key">"parameters"</span>: <span class="c-val">"8B"</span>, <span class="c-key">"quantization"</span>: <span class="c-val">"Q8_0"</span>, <span class="c-key">"version"</span>: <span class="c-val">"3"</span> },
+    <span class="c-key">"input_modalities"</span>: [<span class="c-val">"text"</span>, <span class="c-val">"image"</span>],
+    <span class="c-key">"output_modalities"</span>: [<span class="c-val">"text"</span>],
+    <span class="c-key">"streaming"</span>: <span class="c-val">"supported"</span>,
+    <span class="c-key">"function_calling"</span>: <span class="c-val">"supported"</span>
+  }]
+}</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><span data-l="en">Field</span><span data-l="zh" lang="zh-CN">字段</span></th>
+            <th><span data-l="en">Meaning</span><span data-l="zh" lang="zh-CN">含义</span></th>
+          </tr></thead>
+          <tbody>
+            <tr><td><code>models[].id</code></td><td><span data-l="en">The model ID sent in requests. Must also appear in <code>/models</code>.</span><span data-l="zh" lang="zh-CN">请求中使用的模型 ID，必须同时出现在 <code>/models</code> 中。</span></td></tr>
+            <tr><td><code>display_name</code>, <code>deployment</code></td><td><span data-l="en">Optional labels for the list: name, parameter count, quantization or precision, model version.</span><span data-l="zh" lang="zh-CN">列表中显示的可选信息：名称、参数量、量化或精度、模型版本。</span></td></tr>
+            <tr><td><code>input_modalities</code>, <code>output_modalities</code></td><td><span data-l="en">For example <code>text</code>, <code>image</code>. Image input does not mean image output.</span><span data-l="zh" lang="zh-CN">例如 <code>text</code>、<code>image</code>。支持图像输入不等于支持图像输出。</span></td></tr>
+            <tr><td><code>streaming</code>, <code>function_calling</code>, <code>structured_output</code></td><td><span data-l="en"><code>supported</code>, <code>unsupported</code> or <code>unknown</code>. A missing field means unknown.</span><span data-l="zh" lang="zh-CN"><code>supported</code>、<code>unsupported</code> 或 <code>unknown</code>。缺少字段视为未知。</span></td></tr>
+            <tr><td><code>mock</code></td><td><span data-l="en">The service declares that it is simulated. A missing or false value does not prove real inference.</span><span data-l="zh" lang="zh-CN">服务声明自己是模拟服务。缺少该字段或为 false 也不能证明在做真实推理。</span></td></tr>
+            <tr><td><code>cache_max_age_seconds</code></td><td><span data-l="en">How long the client may reuse this answer (0 to 3600).</span><span data-l="zh" lang="zh-CN">客户端可复用该结果的时长（0 到 3600 秒）。</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted" data-l="en">These values are claims made by the service, read after authentication. They are not test results. The Harness adapter supports text, local images up to 5 MiB, streamed text, function calls with client tool results, and cancellation. It does not implement JSON Schema output, server-side search, remote image URLs or <code>previous_response_id</code>.</p>
+      <p class="muted" data-l="zh" lang="zh-CN">这些值是服务在认证后给出的声明，不是测试结果。Harness 适配器支持文本、5 MiB 以内的本地图片、流式文本、函数调用及客户端工具结果回传、取消请求；未实现 JSON Schema 输出、服务端搜索、远程图片 URL 和 <code>previous_response_id</code>。</p>
+    </section>
+
+    <!-- 7 Trust -->
+    <section id="trust">
+      <h2><span data-l="en">Trust and API keys</span><span data-l="zh" lang="zh-CN">信任与 API key</span></h2>
+      <p data-l="en">mDNS records on a local network are not authenticated, so the client treats them as untrusted input. The draft requires that credentials or prompts are never sent just because a valid-looking service was found. Trust comes from a separate local document that the service operator provides through a trusted channel.</p>
+      <p data-l="zh" lang="zh-CN">局域网中的 mDNS 记录没有认证，所以客户端把它们当作不可信输入。草案要求：不能因为发现了一个看起来有效的服务，就发送凭据或提示词。信任来自一份独立的本地文件，由服务运营者通过可信渠道提供。</p>
+      <h3><span data-l="en">Checks before any key is sent</span><span data-l="zh" lang="zh-CN">发送 key 之前的检查</span></h3>
+      <ul>
+        <li data-l="en">The exact base URL is listed in the local trust document.</li>
+        <li data-l="zh" lang="zh-CN">准确的 base URL 列在本地信任文件中。</li>
+        <li data-l="en">The discovered addresses overlap the allowed addresses for that entry, and the connection is pinned to them.</li>
+        <li data-l="zh" lang="zh-CN">发现的地址与该条目允许的地址有交集，连接固定使用这些地址。</li>
+        <li data-l="en">The certificate chains to the configured CA, matches the advertised host name, and has the expected leaf SHA-256 fingerprint.</li>
+        <li data-l="zh" lang="zh-CN">证书链到配置的 CA，与公告的主机名匹配，叶证书 SHA-256 指纹符合预期。</li>
+        <li data-l="en">The advertised <code>auth</code> hint matches the local policy. An announcement cannot downgrade a service from <code>required</code> to <code>none</code>.</li>
+        <li data-l="zh" lang="zh-CN">公告中的 <code>auth</code> 与本地策略一致。公告不能把服务从 <code>required</code> 降级为 <code>none</code>。</li>
+        <li data-l="en">HTTP redirects are rejected, so a key is never forwarded to another destination.</li>
+        <li data-l="zh" lang="zh-CN">拒绝 HTTP 重定向，key 不会被转发到其他目标。</li>
+      </ul>
+<pre class="code" tabindex="0"><code><span class="c-dim">// trust.json, provided by the service operator</span>
+{
+  <span class="c-key">"schema"</span>: <span class="c-val">"llm-api-discovery-trust/v1"</span>,
+  <span class="c-key">"caFile"</span>: <span class="c-val">"ca.pem"</span>,
+  <span class="c-key">"services"</span>: [{
+    <span class="c-key">"baseURL"</span>: <span class="c-val">"https://api-office-a.local:8443/v1"</span>,
+    <span class="c-key">"allowedAddresses"</span>: [<span class="c-val">"192.168.10.21"</span>],
+    <span class="c-key">"certificateSha256"</span>: <span class="c-val">"&lt;64 hex characters of the leaf certificate DER&gt;"</span>,
+    <span class="c-key">"auth"</span>: <span class="c-val">"required"</span>
+  }]
+}</code></pre>
+      <h3><span data-l="en">Key states in the service list</span><span data-l="zh" lang="zh-CN">服务列表中的 key 状态</span></h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><span data-l="en">Shown as</span><span data-l="zh" lang="zh-CN">显示</span></th>
+            <th><span data-l="en">What it means</span><span data-l="zh" lang="zh-CN">含义</span></th>
+          </tr></thead>
+          <tbody>
+            <tr><td><span data-l="en">No API key required</span><span data-l="zh" lang="zh-CN">无需 API key</span></td><td><span data-l="en">The service announces <code>auth=none</code>. To connect, the local trust entry must also say <code>auth: none</code>. No Authorization header is sent, and TLS checks still apply.</span><span data-l="zh" lang="zh-CN">服务公告了 <code>auth=none</code>。要接入，本地信任条目也必须为 <code>auth: none</code>。不发送 Authorization 头，TLS 检查照常进行。</span></td></tr>
+            <tr><td><span data-l="en">API key saved</span><span data-l="zh" lang="zh-CN">API key 已保存</span></td><td><span data-l="en">A key was verified earlier and stored through the Harness credential service. It is checked again on every connection.</span><span data-l="zh" lang="zh-CN">之前验证过的 key 已通过 Harness 凭据服务保存，每次接入都会重新校验。</span></td></tr>
+            <tr><td><span data-l="en">API key required</span><span data-l="zh" lang="zh-CN">需要 API key</span></td><td><span data-l="en">The user enters a key. It is kept only after <code>/models</code> and <code>/_llm/capabilities</code> both succeed.</span><span data-l="zh" lang="zh-CN">由用户输入 key。只有 <code>/models</code> 和 <code>/_llm/capabilities</code> 都请求成功后才会保留。</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p data-l="en">Saved and session keys are bound to the endpoint, certificate, allowed addresses and auth policy, not to the display name. A same-named service on another network cannot use them. Keys never appear in UI state, logs, browser storage or plugin configuration. Harness's current default credential provider stores records in a local YAML file without OS-level encryption.</p>
+      <p data-l="zh" lang="zh-CN">保存的 key 和仅本次使用的 key 都绑定到接入点、证书、允许地址和认证策略，而不是显示名称，其他网络中同名的服务无法使用。key 不会出现在界面状态、日志、浏览器存储或插件配置中。Harness 当前默认的凭据服务把记录保存在本地 YAML 文件中，没有操作系统级加密。</p>
+      <div class="callout">
+        <p data-l="en"><strong>About <code>auth=none</code>.</strong> The draft's general TXT table allows <code>none</code>, but its Open Responses binding (§5.3) requires <code>auth=required</code>. Key-free Open Responses is therefore a local experiment in this project. Such candidates carry <code>draftAuthCompatible: false</code> and a validation warning.</p>
+        <p data-l="zh" lang="zh-CN"><strong>关于 <code>auth=none</code>。</strong>草案的通用 TXT 字段允许 <code>none</code>，但其 Open Responses 绑定（§5.3）要求 <code>auth=required</code>。因此免 key 的 Open Responses 是本项目的本地实验。这类候选会带有 <code>draftAuthCompatible: false</code> 和一条校验警告。</p>
+      </div>
+    </section>
+
+    <!-- 8 Networks -->
+    <section id="networks">
+      <h2><span data-l="en">Changing networks</span><span data-l="zh" lang="zh-CN">网络切换</span></h2>
+      <p data-l="en">The client follows whichever local network the device is attached to. This works for any move between local networks: office to home, one lab to another, one building to the next. The discovery client reports its state as one of four values.</p>
+      <p data-l="zh" lang="zh-CN">客户端跟随设备当前接入的局域网。任意两个局域网之间的切换都一样：公司到家、一个实验室到另一个实验室、一栋楼到另一栋楼。发现客户端用以下四种状态之一报告自身状态。</p>
+      <div class="callout info">
+        <p data-l="en">Automatic network following (<code>interfaceMode: auto</code>) is in the current prereleases: discovery core <code>0.4.0-roaming.1</code> and Harness plugin <code>0.6.0-roaming.1</code>, both bundled with demo <code>0.7.0-roaming.1</code>. Earlier releases use the configured interface address, or else the first eligible IPv4 interface, without the selection rules and network-change detection described below.</p>
+        <p data-l="zh" lang="zh-CN">自动跟随网络（<code>interfaceMode: auto</code>）属于当前的预发布版本：发现核心库 <code>0.4.0-roaming.1</code> 和 Harness 插件 <code>0.6.0-roaming.1</code>，两者都随 Demo <code>0.7.0-roaming.1</code> 提供。更早的正式版使用配置的网卡地址，未配置时使用第一个可用的 IPv4 网卡，没有下面介绍的选择规则和网络变化识别。</p>
+      </div>
+      <figure class="diagram small">
+        <div class="diagram-scroll"><svg viewBox="0 0 760 270" role="img" aria-labelledby="state-title"><title id="state-title">Discovery client states and the events that move between them</title><rect class="st stop" x="20" y="100" width="130" height="56" rx="10"/><text x="85.0" y="124" text-anchor="middle" class="t-mono t-head">stopped</text><text x="85.0" y="142" text-anchor="middle" class="t-muted" data-l="en">discovery off</text><text x="85.0" y="142" text-anchor="middle" class="t-muted" data-l="zh" lang="zh-CN">发现已关闭</text><rect class="st disc" x="250" y="100" width="180" height="56" rx="10"/><text x="340.0" y="124" text-anchor="middle" class="t-mono t-head">discovering</text><text x="340.0" y="142" text-anchor="middle" class="t-muted" data-l="en">socket open, list live</text><text x="340.0" y="142" text-anchor="middle" class="t-muted" data-l="zh" lang="zh-CN">socket 已打开，列表实时</text><rect class="st wait" x="560" y="100" width="180" height="56" rx="10"/><text x="650.0" y="124" text-anchor="middle" class="t-mono t-head">waiting</text><text x="650.0" y="142" text-anchor="middle" class="t-muted" data-l="en">list empty, retrying</text><text x="650.0" y="142" text-anchor="middle" class="t-muted" data-l="zh" lang="zh-CN">列表为空，重试中</text><rect class="st err" x="250" y="206" width="180" height="50" rx="10"/><text x="340.0" y="230" text-anchor="middle" class="t-mono t-head">error</text><text x="340.0" y="248" text-anchor="middle" class="t-muted" data-l="en">needs a fix</text><text x="340.0" y="248" text-anchor="middle" class="t-muted" data-l="zh" lang="zh-CN">需要处理</text><line class="msg" x1="150" y1="128" x2="244" y2="128"/><polygon class="head " points="250.0,128.0 241.0,123.5 241.0,132.5"/><text x="199" y="120" text-anchor="middle" class="t-mono">start()</text><path class="msg" d="M430,112 C470,72 520,72 554,108"/><polygon class="head " points="560.0,112.0 557.3,102.3 550.6,108.3"/><text x="495" y="72" text-anchor="middle" data-l="en">network lost</text><text x="495" y="72" text-anchor="middle" data-l="zh" lang="zh-CN">网络断开</text><path class="msg" d="M560,146 C520,190 470,190 436,150"/><polygon class="head " points="430.0,144.0 432.7,153.7 439.4,147.7"/><text x="495" y="196" text-anchor="middle" data-l="en">network available</text><text x="495" y="196" text-anchor="middle" data-l="zh" lang="zh-CN">网络可用</text><path class="msg" d="M310,100 C305,42 375,42 370,94"/><polygon class="head " points="370.0,100.0 375.3,91.4 366.3,90.6"/><text x="340" y="30" text-anchor="middle" data-l="en">network changed: clear list, start again</text><text x="340" y="30" text-anchor="middle" data-l="zh" lang="zh-CN">网络变化：清空列表，重新开始</text><line class="msg" x1="340" y1="156" x2="340" y2="200"/><polygon class="head " points="340.0,206.0 344.5,197.0 335.5,197.0"/><text x="328" y="186" text-anchor="end" class="t-muted" data-l="en">bad address or permission denied</text><text x="328" y="186" text-anchor="end" class="t-muted" data-l="zh" lang="zh-CN">地址无效或权限被拒绝</text></svg></div>
+        <figcaption><span data-l="en"><code>waiting</code> needs <code>waitForNetwork: true</code>; without it, a missing network is reported as <code>error</code>. <code>stop()</code> returns to <code>stopped</code> from any state.</span><span data-l="zh" lang="zh-CN"><code>waiting</code> 需要设置 <code>waitForNetwork: true</code>；否则网络缺失会报告为 <code>error</code>。任何状态下调用 <code>stop()</code> 都会回到 <code>stopped</code>。</span></figcaption>
+      </figure>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><span data-l="en">Stage</span><span data-l="zh" lang="zh-CN">阶段</span></th>
+            <th><span data-l="en">What happens</span><span data-l="zh" lang="zh-CN">发生什么</span></th>
+          </tr></thead>
+          <tbody>
+            <tr><td><span data-l="en">On network A</span><span data-l="zh" lang="zh-CN">在网络 A</span></td><td><span data-l="en">Network A's services are listed. The user may have connected one.</span><span data-l="zh" lang="zh-CN">列出网络 A 的服务，用户可能已接入其中一个。</span></td></tr>
+            <tr><td><span data-l="en">Leaving</span><span data-l="zh" lang="zh-CN">离开</span></td><td><span data-l="en">All candidates are cleared and the old socket is closed. A connected route is marked unavailable. Saved keys and the chosen model stay as they are.</span><span data-l="zh" lang="zh-CN">清空所有候选，关闭旧 socket。已接入的路由标记为不可用。已保存的 key 和所选模型保持不变。</span></td></tr>
+            <tr><td><span data-l="en">Between networks</span><span data-l="zh" lang="zh-CN">切换途中</span></td><td><span data-l="en">Status is <code>waiting</code>. The page shows a neutral waiting message, not an error.</span><span data-l="zh" lang="zh-CN">状态为 <code>waiting</code>。页面显示中性的等待提示，而不是错误。</span></td></tr>
+            <tr><td><span data-l="en">On network B</span><span data-l="zh" lang="zh-CN">在网络 B</span></td><td><span data-l="en">Discovery starts on the new interface with a new attachment ID. Late answers from the old socket are ignored.</span><span data-l="zh" lang="zh-CN">在新网卡上以新的附着 ID 开始发现。旧 socket 迟到的应答被忽略。</span></td></tr>
+            <tr><td><span data-l="en">User connects</span><span data-l="zh" lang="zh-CN">用户接入</span></td><td><span data-l="en">Endpoint, addresses, certificate, auth policy and key are checked again before a route is created.</span><span data-l="zh" lang="zh-CN">创建路由之前，重新检查接入点、地址、证书、认证策略和 key。</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3><span data-l="en">Choosing the interface</span><span data-l="zh" lang="zh-CN">选择网卡</span></h3>
+      <p data-l="en">With <code>interfaceMode: auto</code>, the client follows one physical LAN interface at a time, in this order of preference:</p>
+      <p data-l="zh" lang="zh-CN">设置 <code>interfaceMode: auto</code> 时，客户端一次跟随一张物理网卡，优先顺序如下：</p>
+      <ol>
+        <li data-l="en">The adapter named in <code>preferredInterfaceName</code> (for example <code>en0</code>), when it has a usable IPv4 address.</li>
+        <li data-l="zh" lang="zh-CN"><code>preferredInterfaceName</code> 指定的网卡（例如 <code>en0</code>），前提是它有可用的 IPv4 地址。</li>
+        <li data-l="en">A physical adapter that carries the default route, by route metric.</li>
+        <li data-l="zh" lang="zh-CN">承载默认路由的物理网卡，按路由优先级排序。</li>
+        <li data-l="en">The previously selected adapter, if it is still available.</li>
+        <li data-l="zh" lang="zh-CN">之前选中的网卡，如果它仍然可用。</li>
+        <li data-l="en">A stable name and address order among the remaining physical adapters.</li>
+        <li data-l="zh" lang="zh-CN">其余物理网卡按名称和地址的稳定顺序选择。</li>
+      </ol>
+      <p data-l="en">VPN, container and virtual adapters are skipped. Use <code>interfaceMode: pinned</code> with an <code>interfaceAddress</code> to choose one deliberately. The network is checked every 2 seconds by default.</p>
+      <p data-l="zh" lang="zh-CN">VPN、容器和虚拟网卡会被跳过。如需明确指定，使用 <code>interfaceMode: pinned</code> 加 <code>interfaceAddress</code>。默认每 2 秒检查一次网络。</p>
+      <h3><span data-l="en">Same IPv4 address on two networks</span><span data-l="zh" lang="zh-CN">两个网络分配了相同的 IPv4 地址</span></h3>
+      <p data-l="en">Two networks can give the laptop the same address. The client also reads the default gateway and its cached hardware address, read-only, to notice the change: <code>route</code> and <code>arp</code> on macOS, <code>/proc/net/route</code> and <code>/proc/net/arp</code> on Linux, <code>Get-NetRoute</code> and <code>Get-NetNeighbor</code> on Windows. It needs no location permission and contacts no external service. This is best effort; an app with OS network-change notifications can supply a stronger signal through the <code>resolveNetworkAttachment</code> hook.</p>
+      <p data-l="zh" lang="zh-CN">两个网络可能给笔记本分配相同的地址。客户端还会以只读方式读取默认网关及其缓存的硬件地址来识别变化：macOS 使用 <code>route</code> 和 <code>arp</code>，Linux 读取 <code>/proc/net/route</code> 和 <code>/proc/net/arp</code>，Windows 使用 <code>Get-NetRoute</code> 和 <code>Get-NetNeighbor</code>。不需要定位权限，也不访问外部服务。这是尽力而为的检测；能收到系统网络变化通知的应用，可以通过 <code>resolveNetworkAttachment</code> 钩子提供更可靠的信号。</p>
+      <div class="callout info">
+        <p data-l="en">A network change never grants trust, moves keys to a new service, switches the conversation's model or replays a request. Interrupted streams end with an availability message.</p>
+        <p data-l="zh" lang="zh-CN">网络切换不会授予信任，不会把 key 转给新服务，不会更换会话所用的模型，也不会重放请求。被中断的流式请求会以“服务暂不可用”的提示结束。</p>
+      </div>
+    </section>
+
+    <!-- 9 Advertiser -->
+    <section id="advertiser">
+      <h2><span data-l="en">Advertiser lifecycle</span><span data-l="zh" lang="zh-CN">公告器生命周期</span></h2>
+      <p data-l="en">The advertiser publishes services described in a JSON file, or from inside a Node.js service process. Its status moves through <code>probing</code>, <code>announcing</code> and <code>stopped</code>.</p>
+      <p data-l="zh" lang="zh-CN">公告器根据 JSON 配置文件发布服务，也可以嵌入 Node.js 服务进程中运行。状态依次为 <code>probing</code>、<code>announcing</code>、<code>stopped</code>。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><span data-l="en">Field</span><span data-l="zh" lang="zh-CN">字段</span></th>
+            <th><span data-l="en">Meaning</span><span data-l="zh" lang="zh-CN">含义</span></th>
+          </tr></thead>
+          <tbody>
+            <tr><td><code>interfaceAddress</code></td><td><span data-l="en">IPv4 address of the network interface to announce on.</span><span data-l="zh" lang="zh-CN">用于发布公告的网卡 IPv4 地址。</span></td></tr>
+            <tr><td><code>ttl</code></td><td><span data-l="en">Record lifetime in seconds. Default 120; the CLI accepts 1 to 4500.</span><span data-l="zh" lang="zh-CN">记录有效期（秒）。默认 120，命令行允许 1 到 4500。</span></td></tr>
+            <tr><td><code>services[].instanceName</code></td><td><span data-l="en">Unique instance label, up to 63 bytes. Use hyphens, not dots.</span><span data-l="zh" lang="zh-CN">唯一的实例名，最长 63 字节。用连字符，不要用点。</span></td></tr>
+            <tr><td><code>services[].hostname</code></td><td><span data-l="en"><code>.local</code> host name for SRV. Must match the API's TLS certificate.</span><span data-l="zh" lang="zh-CN">SRV 使用的 <code>.local</code> 主机名，必须与 API 的 TLS 证书一致。</span></td></tr>
+            <tr><td><code>services[].address</code>, <code>port</code></td><td><span data-l="en">IPv4 address reachable from clients, and the API port.</span><span data-l="zh" lang="zh-CN">客户端能访问的 IPv4 地址，以及 API 端口。</span></td></tr>
+            <tr><td><code>services[].basePath</code></td><td><span data-l="en">API base path. Default <code>/v1</code>.</span><span data-l="zh" lang="zh-CN">API 根路径，默认 <code>/v1</code>。</span></td></tr>
+            <tr><td><code>services[].auth</code></td><td><span data-l="en"><code>required</code> (default) or <code>none</code>. Must match what the API actually enforces.</span><span data-l="zh" lang="zh-CN"><code>required</code>（默认）或 <code>none</code>，必须与 API 的实际策略一致。</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li data-l="en">Unknown fields are rejected, so a credential cannot slip into TXT by accident. Configuration is limited to 64 KiB and 128 services.</li>
+        <li data-l="zh" lang="zh-CN">未知字段会被拒绝，凭据不会意外进入 TXT。配置文件最大 64 KiB，最多 128 个服务。</li>
+        <li data-l="en">Ctrl+C or SIGTERM sends goodbye records and closes the socket. If the process is killed, records expire after their TTL.</li>
+        <li data-l="zh" lang="zh-CN">按 Ctrl+C 或发送 SIGTERM 会发出 goodbye 记录并关闭 socket。进程被强制结束时，记录在 TTL 到期后失效。</li>
+        <li data-l="en">The CLI does not watch API health. Stop it when the API stops, or embed the library and call <code>setEnabled(id, false)</code>.</li>
+        <li data-l="zh" lang="zh-CN">命令行不监测 API 健康状态。API 停止时应同时停止公告器，或嵌入库并调用 <code>setEnabled(id, false)</code>。</li>
+      </ul>
+    </section>
+
+    <!-- 10 Libraries -->
+    <section id="libraries">
+      <h2><span data-l="en">Using the components</span><span data-l="zh" lang="zh-CN">使用组件</span></h2>
+      <h3><span data-l="en">Announce an existing API</span><span data-l="zh" lang="zh-CN">公告已有的 API</span></h3>
+<pre class="code" tabindex="0"><code><span class="c-dim"># on the machine that serves the API (Node.js 22+)</span>
+npx --no-install llm-api-advertise --list-interfaces
+npx --no-install llm-api-advertise --example my-services.json
+npx --no-install llm-api-advertise --config ./my-services.json --check
+npx --no-install llm-api-advertise --config ./my-services.json --interface 192.168.1.20</code></pre>
+      <h3><span data-l="en">Discover services in your own client</span><span data-l="zh" lang="zh-CN">在自己的客户端中发现服务</span></h3>
+      <p class="muted" data-l="en">This example uses discovery core <code>0.4.0-roaming.1</code>. With release <code>0.3.2</code>, pass <code>interfaceAddress</code> instead of <code>interfaceMode</code>.</p>
+      <p class="muted" data-l="zh" lang="zh-CN">此示例使用发现核心库 <code>0.4.0-roaming.1</code>。使用 <code>0.3.2</code> 正式版时，请用 <code>interfaceAddress</code> 代替 <code>interfaceMode</code>。</p>
+<pre class="code" tabindex="0"><code><span class="c-key">import</span> { createDiscoveryClient } <span class="c-key">from</span> <span class="c-val">'@llm-discovery/discovery-core'</span>;
+
+<span class="c-key">const</span> client = createDiscoveryClient({
+  interfaceMode: <span class="c-val">'auto'</span>,     <span class="c-dim">// follow the current LAN</span>
+  waitForNetwork: <span class="c-val">true</span>,     <span class="c-dim">// wait quietly when offline</span>
+});
+client.subscribe(event => {
+  <span class="c-key">if</span> (event.type === <span class="c-val">'added'</span> || event.type === <span class="c-val">'updated'</span>)
+    console.log(event.candidate.displayName, event.candidate.baseURL);
+});
+<span class="c-key">await</span> client.start();</code></pre>
+      <h3><span data-l="en">Use it in DeepSeek Harness</span><span data-l="zh" lang="zh-CN">在 DeepSeek Harness 中使用</span></h3>
+      <p class="muted" data-l="en">With plugin release <code>0.5.3</code>, use <code>interfaceAddress</code> (your LAN IPv4 address) instead of <code>interfaceMode: auto</code>.</p>
+      <p class="muted" data-l="zh" lang="zh-CN">使用插件 <code>0.5.3</code> 正式版时，请用 <code>interfaceAddress</code>（本机局域网 IPv4 地址）代替 <code>interfaceMode: auto</code>。</p>
+<pre class="code" tabindex="0"><code><span class="c-dim"># profiles/desktop/cordis.patch.yml</span>
+- id: lan-discovery
+  name: dsh-lan-discovery
+  config:
+    trustFile: <span class="c-val">'/Users/alice/llm-discovery/trust.json'</span>
+    interfaceMode: <span class="c-val">auto</span>
+    autoStart: <span class="c-val">true</span></code></pre>
+      <p data-l="en">Full installation steps are in each repository: <a href="https://github.com/nobrowning/llm-api-advertiser">advertiser</a>, <a href="https://github.com/nobrowning/llm-discovery-core">discovery core</a>, <a href="https://github.com/nobrowning/dsh-lan-discovery">Harness plugin</a>, <a href="https://github.com/nobrowning/llm-service-discovery-demo">demo</a>.</p>
+      <p data-l="zh" lang="zh-CN">完整的安装步骤见各仓库：<a href="https://github.com/nobrowning/llm-api-advertiser">公告器</a>、<a href="https://github.com/nobrowning/llm-discovery-core">发现核心库</a>、<a href="https://github.com/nobrowning/dsh-lan-discovery">Harness 插件</a>、<a href="https://github.com/nobrowning/llm-service-discovery-demo">Demo</a>。</p>
+    </section>
+
+    <!-- 11 Scope -->
+    <section id="scope">
+      <h2><span data-l="en">Scope and draft compatibility</span><span data-l="zh" lang="zh-CN">范围与草案兼容性</span></h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><span data-l="en">Topic</span><span data-l="zh" lang="zh-CN">内容</span></th>
+            <th><span data-l="en">Draft-00</span><span data-l="zh" lang="zh-CN">草案 -00</span></th>
+            <th><span data-l="en">This project</span><span data-l="zh" lang="zh-CN">本项目</span></th>
+          </tr></thead>
+          <tbody>
+            <tr><td><span data-l="en">Service type and TXT keys</span><span data-l="zh" lang="zh-CN">服务类型与 TXT 字段</span></td><td><span data-l="en">Defined</span><span data-l="zh" lang="zh-CN">已定义</span></td><td><span data-l="en">Implemented</span><span data-l="zh" lang="zh-CN">已实现</span></td></tr>
+            <tr><td><span data-l="en">Open Responses <code>auth</code></span><span data-l="zh" lang="zh-CN">Open Responses 的 <code>auth</code></span></td><td><span data-l="en">Must be <code>required</code></span><span data-l="zh" lang="zh-CN">必须为 <code>required</code></span></td><td><span data-l="en"><code>required</code> by default; <code>none</code> as a marked experiment</span><span data-l="zh" lang="zh-CN">默认 <code>required</code>；<code>none</code> 作为带标记的实验</span></td></tr>
+            <tr><td><span data-l="en">Capabilities and display metadata</span><span data-l="zh" lang="zh-CN">能力与展示信息</span></td><td><span data-l="en">Out of scope</span><span data-l="zh" lang="zh-CN">不在范围内</span></td><td><span data-l="en">Extension: <code>GET {base}/_llm/capabilities</code></span><span data-l="zh" lang="zh-CN">扩展：<code>GET {base}/_llm/capabilities</code></span></td></tr>
+            <tr><td><span data-l="en">Trust and credentials</span><span data-l="zh" lang="zh-CN">信任与凭据</span></td><td><span data-l="en">Out of scope; records are untrusted</span><span data-l="zh" lang="zh-CN">不在范围内；记录视为不可信</span></td><td><span data-l="en">Local trust document and Harness credential service</span><span data-l="zh" lang="zh-CN">本地信任文件和 Harness 凭据服务</span></td></tr>
+            <tr><td><span data-l="en">Network moves</span><span data-l="zh" lang="zh-CN">网络切换</span></td><td><span data-l="en">Prior approvals must not carry over</span><span data-l="zh" lang="zh-CN">之前的批准不得延续</span></td><td><span data-l="en">Automatic rediscovery; keys bound to service identity</span><span data-l="zh" lang="zh-CN">自动重新发现；key 绑定服务身份</span></td></tr>
+            <tr><td><span data-l="en">IPv6, cross-subnet</span><span data-l="zh" lang="zh-CN">IPv6、跨子网</span></td><td><span data-l="en">Single local link</span><span data-l="zh" lang="zh-CN">限单个本地链路</span></td><td><span data-l="en">IPv4 only; AAAA records kept but IPv6 transport not verified</span><span data-l="zh" lang="zh-CN">仅 IPv4；保留 AAAA 记录，但未验证 IPv6 传输</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li data-l="en">One interface is followed at a time. All network cards are not scanned in parallel.</li>
+        <li data-l="zh" lang="zh-CN">一次只跟随一张网卡，不会同时扫描所有网卡。</li>
+        <li data-l="en">The tests cover selected mDNS behavior. This is not a claim of full RFC 6762/6763 conformance or Open Responses certification.</li>
+        <li data-l="zh" lang="zh-CN">测试覆盖了所选的 mDNS 行为，并不声明完全符合 RFC 6762/6763，也不代表通过 Open Responses 认证。</li>
+        <li data-l="en">The libraries never change firewall, routing, system DNS, certificates or local-network permissions. On macOS, the client app needs the Local Network permission.</li>
+        <li data-l="zh" lang="zh-CN">各组件不会修改防火墙、路由、系统 DNS、证书或局域网权限。在 macOS 上，客户端应用需要获得“本地网络”权限。</li>
+        <li data-l="en">The demo's model answers are simulated. Model names in the demo are display labels.</li>
+        <li data-l="zh" lang="zh-CN">Demo 的模型回答是模拟的，其中的模型名称只是展示标签。</li>
+      </ul>
+    </section>
+
+    <!-- 12 References -->
+    <section id="references">
+      <h2><span data-l="en">References</span><span data-l="zh" lang="zh-CN">参考资料</span></h2>
+      <ul class="refs">
+        <li><a href="https://datatracker.ietf.org/doc/html/draft-cui-dawn-local-llm-api-discovery-00">draft-cui-dawn-local-llm-api-discovery-00</a><span>Discovery of LLM API Services in Local Networks · IETF Internet-Draft</span></li>
+        <li><a href="https://www.rfc-editor.org/rfc/rfc6762">RFC 6762</a><span>Multicast DNS</span></li>
+        <li><a href="https://www.rfc-editor.org/rfc/rfc6763">RFC 6763</a><span>DNS-Based Service Discovery</span></li>
+        <li><a href="https://www.openresponses.org/specification/2026-04-24">Open Responses 2026-04-24</a><span><span data-l="en">API profile used by the binding</span><span data-l="zh" lang="zh-CN">绑定所用的 API profile</span></span></li>
+        <li><a href="https://github.com/nobrowning/llm-discovery-core/blob/main/protocol.mjs">protocol.mjs</a><span><span data-l="en">Record building and validation in the discovery core</span><span data-l="zh" lang="zh-CN">发现核心库中的记录生成与校验代码</span></span></li>
+        <li><a href="https://github.com/nobrowning/llm-service-discovery-demo/blob/main/docs/validation-report.md">validation-report.md</a><span><span data-l="en">What has been tested, on which platforms (Chinese)</span><span data-l="zh" lang="zh-CN">测试范围与平台记录</span></span></li>
+      </ul>
+    </section>
+
+  </article>
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-row">
+    <p><span data-l="en">Local LLM API Discovery · MIT License</span><span data-l="zh" lang="zh-CN">局域网 LLM API 发现 · MIT 许可</span></p>
+    <nav aria-label="Footer">
+      <a href="index.html"><span data-l="en">Home</span><span data-l="zh" lang="zh-CN">首页</span></a>
+      <a href="https://github.com/nobrowning/llm-service-discovery-demo">GitHub</a>
+      <a href="https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/"><span data-l="en">IETF draft</span><span data-l="zh" lang="zh-CN">IETF 草案</span></a>
+      <a href="https://www.rfc-editor.org/rfc/rfc6762">RFC 6762</a>
+      <a href="https://www.rfc-editor.org/rfc/rfc6763">RFC 6763</a>
+    </nav>
+  </div>
+  <div class="wrap footer-projects" id="github-projects">
+    <h2><span data-l="en">Explore the implementation on GitHub</span><span data-l="zh" lang="zh-CN">在 GitHub 查看配套实现</span></h2>
+    <nav class="footer-project-links" aria-label="GitHub projects / GitHub 项目">
+        <a href="https://github.com/nobrowning/llm-service-discovery-demo"><strong>llm-service-discovery-demo</strong><span data-l="en">Run the demo ↗</span><span data-l="zh" lang="zh-CN">运行演示 ↗</span></a>
+        <a href="https://github.com/nobrowning/dsh-lan-discovery"><strong>dsh-lan-discovery</strong><span data-l="en">Harness plugin ↗</span><span data-l="zh" lang="zh-CN">Harness 插件 ↗</span></a>
+        <a href="https://github.com/nobrowning/llm-api-advertiser"><strong>llm-api-advertiser</strong><span data-l="en">Advertise an API ↗</span><span data-l="zh" lang="zh-CN">公告 API 服务 ↗</span></a>
+        <a href="https://github.com/nobrowning/llm-discovery-core"><strong>llm-discovery-core</strong><span data-l="en">Build a discovery client ↗</span><span data-l="zh" lang="zh-CN">开发发现客户端 ↗</span></a>
+    </nav>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>
