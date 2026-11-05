@@ -1,27 +1,34 @@
-# LAN LLM API discovery demo
+# Local LLM API Discovery · Demo
 
-[Project website](https://nobrowning.github.io/llm-service-discovery-demo/)
+[中文](README.zh-CN.md) · [Website](https://nobrowning.github.io/llm-service-discovery-demo/) · [Technical details](https://nobrowning.github.io/llm-service-discovery-demo/technical.html)
 
-[Bilingual website source and GitHub Pages deployment](docs/website.md)
+Find the LLM APIs on your local network the way you find a printer. This repository is a runnable demo of the whole idea: model servers announce themselves, an AI app lists them, and you choose which one to use. It also holds the project website.
 
-[中文说明](README.zh-CN.md) · [Validation report](docs/validation-report.md) · [Protocol mapping](docs/protocol-mapping.md)
+![The LAN services page in DeepSeek Harness, listing three services found on the current network](website/assets/img/network-a.en.jpg)
 
-Discover LAN LLM APIs inside DeepSeek Harness, inspect a service, and connect from a normal conversation. An implementation experiment for [draft-cui-dawn-local-llm-api-discovery-00](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/).
+## Why
 
-Two nodes publish their own mDNS/DNS-SD announcements for three Mock services: DeepSeek text, Qwen vision, and GLM function calling. HTTPS, authentication, SSE, image-byte transfer and tool-result correlation are real; inference is simulated. No model weights, GPU or cloud key is needed. [Model labels](docs/model-presentation.md) do not imply actual model weights are running.
+AI apps such as coding agents, chat apps and IDE assistants are front ends (harnesses) that send requests to an LLM API server. The model runs behind that API, so switching to another server is easy in principle. Finding the server is the hard part:
 
-## Download and run
+- Someone has to share the IP address, port, path and model name by hand.
+- Every app on every device is set up separately.
+- When the server moves, or your laptop joins another network, the settings stop working.
 
-Choose an asset from [GitHub Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases/tag/v0.7.0-roaming.1) and compare its SHA-256 with the same release's `SHA256SUMS`.
+Printers and Wi-Fi solved this long ago: you look at what is available here and pick one. This project does the same for LLM APIs. Servers announce themselves with mDNS/DNS-SD under the service type `_llm-api._tcp`. Apps show the services on the network they are on right now. When the laptop moves to any other local network (office, home, a lab, a client site), the list is rebuilt for that network.
 
-| Deployment | Asset | Prerequisites |
-|---|---|---|
-| Native processes on macOS, Linux or Windows | `llm-service-discovery-demo-0.7.0-roaming.1-native.zip` | Node.js 24+ for your OS/architecture |
-| Two Linux containers, Windows client | `llm-service-discovery-demo-0.7.0-roaming.1-windows-x64-wsl.zip` | Windows x64, Node.js 24+, existing x64 Ubuntu WSL |
+Discovery only shows options. Nothing connects until you choose a service, and every connection is checked over HTTPS against your own trust settings before a key is sent.
 
-Both contain JavaScript dependencies and the plugin tgz. Only the WSL ZIP contains the prebuilt linux/amd64 image. Node.js and Harness are installed separately. GitHub's automatic **Source code** archives require `npm ci --ignore-scripts` first.
+## What the demo includes
 
-For the native ZIP, run these commands from the extracted directory:
+- Two nodes that announce three APIs on your LAN: a text model that needs no key, a vision model that needs a key, and a tool-calling model whose key you save once during setup.
+- The DeepSeek Harness plugin, which lists the services and connects the one you choose to a normal conversation.
+- Network profiles (`--scene company`, `--scene home`) that show the list changing when the laptop changes networks.
+
+Discovery, HTTPS, authentication, streaming, image upload and tool calls are real. Model answers are simulated, so you need no GPU, model weights or cloud key. Model names are display labels only.
+
+## Try it
+
+You need Node.js 24 or later. Download `llm-service-discovery-demo-0.7.0-roaming.1-native.zip` from [Releases](https://github.com/nobrowning/llm-service-discovery-demo/releases), check it against `SHA256SUMS`, unzip it, and run from that folder:
 
 ```sh
 node scripts/verify-release-files.mjs
@@ -29,56 +36,41 @@ node packages/lab-controller/cli.mjs list-interfaces
 node packages/lab-controller/cli.mjs native run --runtime .runtime/native --interface YOUR_LAN_IPV4
 ```
 
-Replace `YOUR_LAN_IPV4` with a local address from the list. Keep the foreground terminal open. In another terminal, enter the same extracted directory:
+Replace `YOUR_LAN_IPV4` with your address from the list and keep the terminal open. Then install the plugin from `vendor/` into Harness and open **LAN services**.
 
-```sh
-node scripts/verify-live.mjs --runtime .runtime/native
-node scripts/verify-lifecycle.mjs --backend native --runtime .runtime/native
-```
+Step-by-step guides:
 
-Keep the service terminal running while using Harness. When finished, stop with `node packages/lab-controller/cli.mjs native stop --runtime .runtime/native` or Ctrl+C in that terminal.
+- [macOS with Harness Desktop](docs/mac-desktop-quickstart.md)
+- [macOS, Linux or Windows, native processes](docs/native-quickstart.md)
+- [Windows with two WSL containers](docs/windows-quickstart.md)
+- [Install the Harness plugin](docs/plugin-setup.md) and [set up the three API key states](docs/api-key-demo.md)
+- [All download, run and development details](docs/running.md) (English)
 
-See [native setup](docs/native-quickstart.md) for interface selection, cross-device trust, permissions and optional Linux Docker Engine instructions. Mac users can follow the [Desktop guide](docs/mac-desktop-quickstart.md) for plugin installation and conversation checks, or [SSH setup](docs/mac-ssh-validation.md) for remote testing. Runtime certificates and synthetic keys are generated locally and retained across restarts.
+Most guides under `docs/` are written in Chinese.
 
-For the WSL ZIP, use Windows PowerShell:
+## Project repositories
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
-```
+| Repository | What it does |
+|---|---|
+| [llm-api-advertiser](https://github.com/nobrowning/llm-api-advertiser) | Announces an LLM API on the local network. Runs next to the server. |
+| [llm-discovery-core](https://github.com/nobrowning/llm-discovery-core) | Finds and checks announced services. A library for client apps. |
+| [dsh-lan-discovery](https://github.com/nobrowning/dsh-lan-discovery) | Lists LAN services inside DeepSeek Harness and connects the one you choose. |
+| **llm-service-discovery-demo** (this repository) | Runnable demo with simulated APIs, and the project website in [`website/`](website/). |
 
-The launcher verifies/imports the bundled image into the project daemon. First-time Docker static/Compose downloads require internet. See [Windows setup](docs/windows-quickstart.md); stop with `scripts/stop-demo.ps1`. Containers share the WSL host IP with different ports/base paths. This does not establish Docker Desktop multicast support.
+## Status
 
-## Harness client
+This is an experimental implementation of the IETF Internet-Draft [Discovery of LLM API Services in Local Networks](https://datatracker.ietf.org/doc/draft-cui-dawn-local-llm-api-discovery/) (draft-cui-dawn-local-llm-api-discovery-00). It uses IPv4 mDNS on one network interface at a time and only finds services on the same local network. It does not claim full RFC or draft conformance. What has been tested, and on which platforms, is in the [validation report](docs/validation-report.md).
 
-Install `vendor/dsh-lan-discovery-0.6.0-roaming.1.tgz` using the CLI belonging to your Harness installation, then set the trust file and `interfaceMode: auto` to follow the client's current LAN. See [plugin setup](docs/plugin-setup.md). Host compatibility is pinned to **0.2.1-rc.3 / rc.5**. Windows/macOS Desktop, Linux Web Host evaluation, and standalone service execution have separate acceptance requirements.
-
-Open **LAN services / 局域网服务**. Select a row to reveal inspection, connection and API key controls. Selection does not connect automatically; collapse/switch clears unsent passwords. English/Chinese follows Harness's locale preference. Discovery alone never authorizes sending credentials.
-
-**Three key states:** DeepSeek needs none; save the synthetic GLM key once; leave Qwen-VL awaiting a key. The local presenter file is in your runtime's `presenter/demo-api-keys.txt`. [API key setup](docs/api-key-demo.md) explains migration/reset. Saved keys use the Harness credential provider; its current default is an unencrypted local YAML file, not an OS keychain. No real provider credentials are needed.
-
-The keyless Open Responses service is an explicit experimental extension: draft -00 requires `auth=required`. TLS trust is provisioned independently.
-
-## Develop and validate
+## Develop
 
 ```sh
 npm ci --ignore-scripts
 npm test
 node scripts/verify-components.mjs
-node packages/lab-controller/cli.mjs --help
 ```
 
-CI checks Windows x64, Linux x64/arm64 and macOS x64/arm64 with Node 24. Pure JavaScript dependencies do not need per-OS native addons. Unit/package checks, real mDNS/HTTPS tests, independent observers and actual Harness UI tests are separate evidence. Full RFC conformance, IPv6 multicast and cross-subnet discovery are not claimed.
+More: [protocol mapping](docs/protocol-mapping.md), [repository boundaries](docs/repositories.md), [release notes](docs/release-notes.md), [five-minute demo script](docs/demo-script.md), [Mock API contract](packages/mock-api/README.md), [website source](website/README.md).
 
-- [Repository boundaries](docs/repositories.md)
-- [Release notes](docs/release-notes.md) and [readiness](docs/release-readiness.md)
-- [Five-minute demonstration](docs/demo-script.md)
-- [Historical Windows network investigation](docs/network-spike.md)
-- [Mock API contract](packages/mock-api/README.md)
+## License
 
-Core, advertiser and plugin have their own repositories. Versioned tgz files in `vendor/` let this repository install independently. All four projects use [MIT](LICENSE); npm and image-registry distributions are not published. Keep runtime directories, certificates, keys and user profiles out of shared archives.
-
-## Company-to-home candidate
-
-This prerelease bundles automatic network rediscovery. New runtimes accept `--scene company` or `--scene home`; see [model presentation](docs/model-presentation.md). The company scene presents DeepSeek-R1-Distill-Qwen-32B (Q4_K_M), Qwen2.5-VL-7B-Instruct (BF16), and GLM-4-9B-Chat (INT4); home presents Qwen3-8B (Q8_0). These are simulated deployment labels, not running model weights. Existing runtime keys and certificates are retained; choose a new runtime directory for a different scene. [Validation scope](docs/validation-report.md) distinguishes controlled Web Host evidence from physical-interface core/TLS checks.
-
-[Company-to-home verification](docs/company-home-validation.md) records the controlled UI and physical interface checks separately.
+[MIT](LICENSE). All four repositories use the MIT license.

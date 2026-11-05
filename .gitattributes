@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.tgz binary
+*.woff2 binary
+*.jpg binary
